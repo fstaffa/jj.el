@@ -5,6 +5,6 @@
 
 [[https://magit.vc/][Magit]] like interface to [[https://jj-vcs.github.io/jj/latest/][Jujutsu]] version control system. Current goal is to use this project to learn more about both Emacs packages and Jujutsu.
 
-There are currently more advanced implementations for Jujutsu:
-* [[https://github.com/bennyandresen/jujutsu.el][jujutsu.el]] - Magit like interface
-* [[https://codeberg.org/emacs-jj-vc/vc-jj.el][vc-jj.el]] - ~vc.el~ integration
+There are currently more feature complete implementations for Jujutsu:
+- [[https://github.com/bennyandresen/jujutsu.el][jujutsu.el]] - Magit like interface
+- [[https://codeberg.org/emacs-jj-vc/vc-jj.el][vc-jj.el]] - ~vc.el~ integration

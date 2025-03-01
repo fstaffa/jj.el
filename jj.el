@@ -31,14 +31,12 @@
       directory-file-name
       file-name-nondirectory))
 
-(defun jj-status-mode--quit ()
+(defun jj-window-quit ()
+  "Quits current jj mode window."
   (interactive)
   (quit-window))
 
-(defvar jj-status-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "q") #'jj-status-mode--quit)
-    map))
+(define-key jj-status-mode-map (kbd "q") #'jj-window-quit)
 
 (define-derived-mode jj-status-mode special-mode "jj-status"
   "Major mode for displaying Jujutsu status."
@@ -65,6 +63,7 @@
         (jj-status-mode)))
     (switch-to-buffer buffer)))
 
-(evil-define-key 'normal jj-status-mode-map (kbd "q") #'jj-status-mode--quit)
+(evil-define-key 'normal jj-status-mode-map (kbd "q") #'jj-window-quit)
 
+(map! :leader :desc "jujutsu status" "j s" #'jj-status)
 ;;; jj.el ends here
