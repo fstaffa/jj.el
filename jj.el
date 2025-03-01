@@ -119,7 +119,9 @@
   ["Actions"
    ("d" "Describe change" jj-status-describe-popup)
    ("a" "Abandon change" jj-status-abandon-popup)
-   ])
+   ]
+  ["Essential commands"
+   ("q" "Quit" jj-window-quit)])
 
 (define-key jj-status-mode-map (kbd "q") #'jj-window-quit)
 (define-key jj-status-mode-map (kbd "?") #'jj-status-popup)
