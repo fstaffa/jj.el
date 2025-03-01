@@ -20,6 +20,7 @@
 
 
 (provide 'jj)
+(require 'transient)
 
 
 (defun jj--get-project-folder ()
@@ -36,7 +37,6 @@
   (interactive)
   (quit-window))
 
-(define-key jj-status-mode-map (kbd "q") #'jj-window-quit)
 
 (define-derived-mode jj-status-mode special-mode "jj-status"
   "Major mode for displaying Jujutsu status."
@@ -63,7 +63,31 @@
         (jj-status-mode)))
     (switch-to-buffer buffer)))
 
-(evil-define-key 'normal jj-status-mode-map (kbd "q") #'jj-window-quit)
 
+(defun jj-status-describe (args)
+  "Run jj describe with ARGS."
+  (interactive (list (transient-args 'jj-status-describe-popup)))
+  (let* ((cmd (concat "describe " (string-join args " "))))
+    (message cmd)
+    (jj--run-command cmd)
+    (jj-status)))
+
+(transient-define-prefix jj-status-describe-popup ()
+  "Popup for jujutsu describe comand."
+  ["Options"
+   ("-m" "Message" "-m=" :reader (lambda (&rest _args) (s-concat "\"" (read-string "-m ") "\"")))]
+  ["Actions"
+   ("d" "Describe" jj-status-describe)])
+
+(transient-define-prefix jj-status-popup ()
+  "Popup for jujutsu actions in the status buffer."
+  ["Actions"
+   ("d" "Describe change" jj-status-describe-popup)]
+  )
+
+(define-key jj-status-mode-map (kbd "q") #'jj-window-quit)
+(define-key jj-status-mode-map (kbd "?") #'jj-status-popup)
+(evil-define-key 'normal jj-status-mode-map (kbd "q") #'jj-window-quit)
+(evil-define-key 'normal jj-status-mode-map (kbd "?") #'jj-status-popup)
 (map! :leader :desc "jujutsu status" "j s" #'jj-status)
 ;;; jj.el ends here
