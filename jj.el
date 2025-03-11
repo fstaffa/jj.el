@@ -63,6 +63,7 @@
         (jj-status-mode)))
     (switch-to-buffer buffer)))
 
+
 (defun jj-status-describe (args)
   "Run jj describe with ARGS."
   (interactive (list (transient-args 'jj-status-describe-popup)))
@@ -114,18 +115,56 @@
   ["Actions"
    ("b" "Abandon branch from trunk" jj--status-abandon-revset-from-trunk)])
 
+(defun jj--log (args)
+  "Run jj log with ARGS."
+  (interactive (list (transient-args 'jj-status-log-popup)))
+  (let* ((cmd (concat "log " (string-join args " "))))
+    (jj--log-show cmd)))
+
+(defun jj--log-show (cmd)
+  "Show log for given CMD."
+  (interactive)
+  (let ((buffer (get-buffer-create (format "jj log: %s" (jj--get-project-name)))))
+    (with-current-buffer buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert (jj--run-command cmd))
+        (jj-status-mode)))
+    (switch-to-buffer buffer))
+  )
+
+(transient-define-prefix jj-status-log-popup ()
+  "Popup for jujutsu log command"
+  :value '("-n=256")
+  ["Options"
+   ("-r" "Revisions" "--revisions=" :reader (lambda (&rest _args) (s-concat "\"" (read-string "-r ") "\"")))
+   ("-n" "Number of revisions to show" "-n=" :reader (lambda (&rest _args) (s-concat "\"" (read-string "-n ") "\"")))
+   ("-s" "Summary, for each path show only whethr it was added, modified or deleted" "--summary" )
+   ("-p" "Show patch" "--patch" )
+   ("-R" "Show revisions in the opposite order (older first)" "--reversed" )
+   ("-G" "Do not display the graph" "--no-graph" )
+   ("-S" "Show histogram of changes" "--stat" )
+   ("-w" "Ignore whitespace when comparing lines" "--ignore-all-space" )
+   ("-W" "Ignore changes in amount of whitespace when comparing lines" "--ignore-space-change" )
+   ]
+  ["Actions"
+   ("l" "Log" jj--log)])
+
 (transient-define-prefix jj-status-popup ()
   "Popup for jujutsu actions in the status buffer."
   ["Actions"
    ("d" "Describe change" jj-status-describe-popup)
    ("a" "Abandon change" jj-status-abandon-popup)
+   ("l" "Log" jj-status-log-popup)
    ]
   ["Essential commands"
    ("q" "Quit" jj-window-quit)])
 
 (define-key jj-status-mode-map (kbd "q") #'jj-window-quit)
+(define-key jj-status-mode-map (kbd "l") #'jj-status-log-popup)
 (define-key jj-status-mode-map (kbd "?") #'jj-status-popup)
 (evil-define-key 'normal jj-status-mode-map (kbd "q") #'jj-window-quit)
+(evil-define-key 'normal jj-status-mode-map (kbd "l") #'jj-status-log-popup)
 (evil-define-key 'normal jj-status-mode-map (kbd "?") #'jj-status-popup)
 (map! :leader :desc "jujutsu status" "j s" #'jj-status)
 ;;; jj.el ends here
