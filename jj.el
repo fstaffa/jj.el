@@ -133,11 +133,15 @@
     (switch-to-buffer buffer))
   )
 
+(defun jj--revset-read (&rest _args)
+  "Read revset from user."
+  (s-concat "\"" (read-string "-r ") "\""))
+
 (transient-define-prefix jj-status-log-popup ()
   "Popup for jujutsu log command"
   :value '("-n=256")
   ["Options"
-   ("-r" "Revisions" "--revisions=" :reader (lambda (&rest _args) (s-concat "\"" (read-string "-r ") "\"")))
+   ("-r" "Revisions" "--revisions=" :reader jj--revset-read)
    ("-n" "Number of revisions to show" "-n=" :reader (lambda (&rest _args) (s-concat "\"" (read-string "-n ") "\"")))
    ("-s" "Summary, for each path show only whethr it was added, modified or deleted" "--summary" )
    ("-p" "Show patch" "--patch" )
@@ -150,12 +154,68 @@
   ["Actions"
    ("l" "Log" jj--log)])
 
+(defun jj--read-revision ()
+  "Read revision from user."
+  (read-string "Revision: "))
+
+(transient-define-suffix jj--new-parent-revisions-add ()
+  "Add REV to the list of parent revisions."
+  (interactive)
+  (let ((rev (jj--read-revision))
+        (scope (transient-scope)))
+    (if (and (stringp rev) (not (string-empty-p rev)))
+        (push rev scope)
+      (user-error (format "Invalid revision %s" rev)))
+    (transient-setup transient-current-command nil nil :scope scope)
+    (message "Added %s" rev)
+    (message "Parents: %s" scope)
+    ))
+
+(transient-define-suffix jj--new-parent-revisions-clear ()
+  "Clear list of parent revisions."
+  (interactive)
+  (transient-setup transient-current-command nil nil :scope nil)
+  (transient--redisplay))
+
+(defun jj--new-parent-revisions-display ()
+  "Display list of parent revisions."
+  (if (transient-scope)
+      (format "Parents: %s" (s-join ", " (transient-scope)))
+    "Using default parent (@)"))
+
+(defun jj--new (args)
+  "Run jj new with ARGS."
+  (interactive (list (transient-args 'jj-status-new-popup)))
+  (let* ((cmd (string-join (append '("new") (transient-scope) args) " ")))
+    (jj--run-command cmd)
+    (jj-status)))
+
+(transient-define-prefix jj-status-new-popup ()
+  "Popup for jujutsu new command."
+  ["Parent revisions"
+   (:info #'jj--new-parent-revisions-display)
+   ("a" "Add parent revision" jj--new-parent-revisions-add :transient t)
+   ("c" "Clear parent revisions" jj--new-parent-revisions-clear :transient t)
+   ]
+
+  ["Options"
+   ("-m" "Message" "-m=" :reader (lambda (&rest _args) (s-concat "\"" (read-string "-m ") "\"")))
+   ("-E" "Do not edit the newly created change" "--no-edit")
+   ("-b" "Insert the new change before the given commit" "--insert-before" :reader jj--revset-read)
+   ("-a" "Insert the new change after the given commit" "--insert-after" :reader jj--revset-read)
+   ]
+  ["Actions"
+   ("n" "New" jj--new)]
+  (interactive)
+  (transient-setup 'jj-status-new-popup nil nil :scope nil))
+
 (transient-define-prefix jj-status-popup ()
   "Popup for jujutsu actions in the status buffer."
   ["Actions"
    ("d" "Describe change" jj-status-describe-popup)
    ("a" "Abandon change" jj-status-abandon-popup)
    ("l" "Log" jj-status-log-popup)
+   ("n" "new" jj-status-new-popup)
    ]
   ["Essential commands"
    ("q" "Quit" jj-window-quit)])
