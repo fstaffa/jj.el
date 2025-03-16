@@ -1,4 +1,4 @@
-;;; jj.el --- Description -*- lexical-binding: t; -*-
+;;; jj.el --- Integration with jujutsu version control system -*- lexical-binding: t; -*-
 ;;
 ;; Copyright (C) 2025 Filip Staffa
 ;;
@@ -7,19 +7,19 @@
 ;; Created: February 28, 2025
 ;; Modified: February 28, 2025
 ;; Version: 0.0.1
-;; Package-Requires: ((emacs "28.1") (s "1.13.0"))
-;;
+;; Package-Requires: ((emacs "28.1") (s "1.13.0") (transient "0.8.0"))
+;; Keywords: jj jujutsu vcs
+;; URL: https://github.com/fstaffa/jj.el
 ;; This file is not part of GNU Emacs.
 ;;
 ;;; Commentary:
-;;
-;;  Description
 ;;
 ;;; Code:
 
 
 
 (require 's)
+(require 'transient)
 (provide 'jj)
 
 
@@ -27,10 +27,10 @@
   (locate-dominating-file default-directory ".jj" ))
 
 (defun jj--get-project-name ()
-  (-> (jj--get-project-folder)
-      file-name-directory
-      directory-file-name
-      file-name-nondirectory))
+  (file-name-nondirectory
+   (directory-file-name
+    (file-name-directory
+     (jj--get-project-folder)))))
 
 (defun jj-window-quit ()
   "Quits current jj mode window."
