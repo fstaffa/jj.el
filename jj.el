@@ -59,7 +59,7 @@
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (erase-buffer)
-        (insert (jj--run-command "st"))
+        (insert (jj--run-command "status"))
         (jj-status-mode)))
     (switch-to-buffer buffer)))
 
@@ -94,7 +94,6 @@
         (jj-status-abandon (append (list (format "\"%s\""  jj-current-revset)))))))
 
 (defun jj--bookmarks-get ()
-  "Get bookmarks from jj."
   (let ((bookmarks (jj--run-command "bookmark list -T 'name ++ \"\n\"'")))
     (s-split "\n" bookmarks 't)))
 
@@ -209,6 +208,48 @@
   (interactive)
   (transient-setup 'jj-status-new-popup nil nil :scope nil))
 
+(defun jj--fetch (args)
+  "Run jj fetch with ARGS."
+  (interactive (list (transient-args 'jj-fetch-popup)))
+  (let* ((cmd (string-join (append '("git fetch") args) " ")))
+    (jj--run-command cmd)
+    (message "Successfully fetched")
+    (jj-status)))
+
+(transient-define-prefix jj-fetch-popup ()
+  "Popup for jujutsu git fetch command"
+  :value '("--branch=glob:*")
+  ["Options"
+   ("-b" "Fetch only some branches" "--branch" :reader (lambda (&rest _args) (s-concat  "\"" (read-string "--branch ") "\"")))
+   ("-r" "The remote to fetch from" "--remote" (lambda (&rest _args) (s-concat  "\"" (read-string "--branch ") "\""))) ;;can be repeated
+   ("-a" "Fetch from all remotes" "--all-remotes")
+   ]
+  ["Actions"
+   ("f" "Fetch" jj--fetch)])
+
+(defun jj--push (args)
+  "Run jj push with ARGS."
+  (interactive (list (transient-args 'jj-push-popup)))
+  (let* ((cmd (string-join (append '("git push") args) " ")))
+    (jj--run-command cmd)
+    (jj-status)))
+
+(transient-define-prefix jj-push-popup ()
+  "Popup for jujutsu git push command"
+  ["Options"
+   ("-b" "Push only this bookmark or bookmarks matchin a pattern" "--bookmark=" :reader (lambda (&rest _args) (s-concat  "\"" (read-string "--branch ") "\""))) ;;can be repeated
+   ("-c" "Push this commit by creating a bookmark based on its change ID" "--change=" :reader (lambda (&rest _args) (s-concat  "\"" (read-string "--change ") "\""))) ;;can be repeated
+   ("-r" "The remote to push to" "--remote=" (lambda (&rest _args) (s-concat  "\"" (read-string "--branch ") "\"")))
+   ("-a" "Push all bookmark (including new and deleted)" "--all")
+   ("-t" "Push all tracked bookmarks" "--tracked")
+   ("-N" "Push all new bookmarks" "--allow-new")
+   ("-d" "Push all deleted bookmarks" "--deleted")
+   ("-e" "Allow pushing commits with empty descriptions" "--allow-empty-description")
+   ("-P" "Allow pushing commits that are private" "--allow-private")
+   ]
+  ["Push"
+   ("p" "Push" jj--push)])
+
 (transient-define-prefix jj-status-popup ()
   "Popup for jujutsu actions in the status buffer."
   ["Actions"
@@ -216,7 +257,8 @@
    ("a" "Abandon change" jj-status-abandon-popup)
    ("l" "Log" jj-status-log-popup)
    ("n" "new" jj-status-new-popup)
-   ]
+   ("f" "fetch" jj-fetch-popup)
+   ("p" "push" jj-push-popup)]
   ["Essential commands"
    ("q" "Quit" jj-window-quit)])
 
