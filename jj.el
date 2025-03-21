@@ -238,7 +238,6 @@
   "Popup for jujutsu git push command"
   ["Options"
    ("-b" "Push only this bookmark or bookmarks matchin a pattern" "--bookmark=" :reader (lambda (&rest _args) (s-concat  "\"" (read-string "--branch ") "\""))) ;;can be repeated
-   ("-c" "Push this commit by creating a bookmark based on its change ID" "--change=" :reader (lambda (&rest _args) (s-concat  "\"" (read-string "--change ") "\""))) ;;can be repeated
    ("-r" "The remote to push to" "--remote=" (lambda (&rest _args) (s-concat  "\"" (read-string "--branch ") "\"")))
    ("-a" "Push all bookmark (including new and deleted)" "--all")
    ("-t" "Push all tracked bookmarks" "--tracked")
@@ -248,7 +247,10 @@
    ("-P" "Allow pushing commits that are private" "--allow-private")
    ]
   ["Push"
-   ("p" "Push" jj--push)])
+   ("p" "Push" jj--push)
+   ("c" "Push current commit (@)" (lambda ()
+                                    (interactive)
+                                    (jj--push (append '("-c=@") (transient-args 'jj-push-popup)))))])
 
 (transient-define-prefix jj-status-popup ()
   "Popup for jujutsu actions in the status buffer."
