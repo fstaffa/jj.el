@@ -64,12 +64,80 @@
     (switch-to-buffer buffer)))
 
 
+(defvar jj-describe-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-c C-c") 'jj-describe-finish)
+    (define-key map (kbd "C-c C-k") 'jj-describe-cancel)
+    map)
+  "Keymap for `jj-describe-mode'.")
+
+(define-derived-mode jj-describe-mode text-mode "JJ-Describe"
+  "Major mode for editing JJ commit messages."
+  (setq-local comment-start "#")
+  (setq-local comment-end "")
+  (setq-local comment-use-syntax nil)
+  (setq-local font-lock-defaults '(nil t))
+  (font-lock-add-keywords nil
+                          '(("^#.*" . font-lock-comment-face)))
+  (auto-fill-mode 1))
+
+(defun jj-describe-finish ()
+  "Finish editing the commit message and execute the describe command."
+  (interactive)
+  (let ((message (buffer-substring-no-properties (point-min) (point-max)))
+        (buffer (current-buffer)))
+    ;; Remove comment lines
+    (with-temp-buffer
+      (insert message)
+      (goto-char (point-min))
+      (while (re-search-forward "^#.*\n" nil t)
+        (replace-match ""))
+      (setq message (string-trim (buffer-string))))
+    
+    (if (string-empty-p message)
+        (message "Aborting describe due to empty message")
+      (let ((cmd (concat "describe -m \"" (replace-regexp-in-string "\"" "\\\\\"" message) "\"")))
+        (jj--run-command cmd)
+        (message "Change described successfully")))
+    
+    (kill-buffer buffer)
+    (jj-status)))
+
+(defun jj-describe-cancel ()
+  "Cancel the describe operation."
+  (interactive)
+  (message "Describe canceled")
+  (kill-buffer (current-buffer))
+  (jj-status))
+
 (defun jj-status-describe (args)
   "Run jj describe with ARGS."
   (interactive (list (transient-args 'jj-status-describe-popup)))
-  (let* ((cmd (concat "describe " (string-join args " "))))
-    (jj--run-command cmd)
-    (jj-status)))
+  (if (seq-find (lambda (arg) (string-prefix-p "-m=" arg)) args)
+      (let* ((cmd (concat "describe " (string-join args " "))))
+        (jj--run-command cmd)
+        (jj-status))
+    (let* ((buffer (get-buffer-create "*jj-describe*"))
+           (current-description (string-trim (jj--run-command "log --no-graph -r @ -T description"))))
+      (with-current-buffer buffer
+        (jj-describe-mode)
+        (erase-buffer)
+        (when (not (string-empty-p current-description))
+          (insert current-description)
+          (insert "\n"))
+        (insert "
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the describe.
+#
+# Current changes to describe:
+")
+        ;; Insert the status output as comments
+        (let ((status (jj--run-command "status")))
+          (dolist (line (split-string status "\n"))
+            (insert "# " line "\n")))
+        (goto-char (point-min)))
+      (switch-to-buffer buffer)
+      (message "Type C-c C-c to finish, C-c C-k to cancel"))))
 
 (transient-define-prefix jj-status-describe-popup ()
   "Popup for jujutsu describe comand."
@@ -112,6 +180,7 @@
 (transient-define-prefix jj-status-abandon-popup ()
   "Popup for jujutsu abandon comand."
   ["Actions"
+   ("a" "Abandon current commit" jj-status-abandon)
    ("b" "Abandon branch from trunk" jj--status-abandon-revset-from-trunk)])
 
 (defun jj--log (args)
@@ -237,18 +306,37 @@
 (transient-define-prefix jj-push-popup ()
   "Popup for jujutsu git push command"
   ["Options"
-   ("-b" "Push only this bookmark or bookmarks matchin a pattern" "--bookmark=" :reader (lambda (&rest _args) (s-concat  "\"" (read-string "--branch ") "\""))) ;;can be repeated
-   ("-c" "Push this commit by creating a bookmark based on its change ID" "--change=" :reader (lambda (&rest _args) (s-concat  "\"" (read-string "--change ") "\""))) ;;can be repeated
-   ("-r" "The remote to push to" "--remote=" (lambda (&rest _args) (s-concat  "\"" (read-string "--branch ") "\"")))
-   ("-a" "Push all bookmark (including new and deleted)" "--all")
-   ("-t" "Push all tracked bookmarks" "--tracked")
-   ("-N" "Push all new bookmarks" "--allow-new")
-   ("-d" "Push all deleted bookmarks" "--deleted")
+   ("-r" "The remote to push to" "--remote=" (lambda (&rest _args) (s-concat  "\"" (read-string "--remote ") "\"")))
    ("-e" "Allow pushing commits with empty descriptions" "--allow-empty-description")
    ("-P" "Allow pushing commits that are private" "--allow-private")
    ]
   ["Push"
-   ("p" "Push" jj--push)])
+   ("p" "Push" jj--push)
+   ("c" "Push current commit (@)" (lambda ()
+                                    (interactive)
+                                    (jj--push (append '("-c=@") (transient-args 'jj-push-popup)))))
+   ("C" "Push specific revision" (lambda ()
+                                   (interactive)
+                                   (let ((revision (jj--read-revision)))
+                                     (jj--push (append (list (format "-c=%s" revision)) 
+                                                       (transient-args 'jj-push-popup))))))
+   ("b" "Push specific bookmark" (lambda ()
+                                   (interactive)
+                                   (let ((bookmark (read-string "Bookmark: ")))
+                                     (jj--push (append (list (format "--bookmark=\"%s\"" bookmark)) 
+                                                       (transient-args 'jj-push-popup))))))
+   ("a" "Push all bookmarks" (lambda ()
+                               (interactive)
+                               (jj--push (append '("--all") (transient-args 'jj-push-popup)))))
+   ("t" "Push tracked bookmarks" (lambda ()
+                                   (interactive)
+                                   (jj--push (append '("--tracked") (transient-args 'jj-push-popup)))))
+   ("n" "Push new bookmarks" (lambda ()
+                               (interactive)
+                               (jj--push (append '("--allow-new") (transient-args 'jj-push-popup)))))
+   ("d" "Push deleted bookmarks" (lambda ()
+                                   (interactive)
+                                   (jj--push (append '("--deleted") (transient-args 'jj-push-popup)))))])
 
 (transient-define-prefix jj-status-popup ()
   "Popup for jujutsu actions in the status buffer."
@@ -264,9 +352,20 @@
 
 (define-key jj-status-mode-map (kbd "q") #'jj-window-quit)
 (define-key jj-status-mode-map (kbd "l") #'jj-status-log-popup)
+(define-key jj-status-mode-map (kbd "d") #'jj-status-describe-popup)
+(define-key jj-status-mode-map (kbd "a") #'jj-status-abandon-popup)
+(define-key jj-status-mode-map (kbd "n") #'jj-status-new-popup)
+(define-key jj-status-mode-map (kbd "f") #'jj-fetch-popup)
+(define-key jj-status-mode-map (kbd "p") #'jj-push-popup)
 (define-key jj-status-mode-map (kbd "?") #'jj-status-popup)
+
 (evil-define-key 'normal jj-status-mode-map (kbd "q") #'jj-window-quit)
 (evil-define-key 'normal jj-status-mode-map (kbd "l") #'jj-status-log-popup)
+(evil-define-key 'normal jj-status-mode-map (kbd "d") #'jj-status-describe-popup)
+(evil-define-key 'normal jj-status-mode-map (kbd "a") #'jj-status-abandon-popup)
+(evil-define-key 'normal jj-status-mode-map (kbd "n") #'jj-status-new-popup)
+(evil-define-key 'normal jj-status-mode-map (kbd "f") #'jj-fetch-popup)
+(evil-define-key 'normal jj-status-mode-map (kbd "p") #'jj-push-popup)
 (evil-define-key 'normal jj-status-mode-map (kbd "?") #'jj-status-popup)
 (map! :leader :desc "jujutsu status" "j s" #'jj-status)
 ;;; jj.el ends here
