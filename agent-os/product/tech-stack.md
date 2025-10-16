@@ -4,8 +4,8 @@
 
 ### Language
 - **Emacs Lisp**: Primary implementation language with lexical binding enabled
-- **Minimum Version**: Emacs 28.1 (declared in package requirements)
-- **Target Versions**: Emacs 28.1, 29.x, 30.x (for CI testing)
+- **Minimum Version**: Emacs 29.1 (declared in Eask file)
+- **Target Versions**: Emacs 29.4, 30.1, snapshot (for CI testing)
 
 ### Package Management
 - **Eask**: Development task runner and dependency management
@@ -34,6 +34,11 @@
   - Unit testing
   - Integration testing with mocked jj CLI
   - Test fixtures and assertions
+
+- **undercover.el**: Code coverage reporting tool
+  - Tracks line coverage during test execution
+  - Generates SimpleCov-format JSON output
+  - Integrates with GitHub Actions for coverage display
 
 ### Optional Integrations
 - **Evil mode**: Vim-style keybindings (detected at runtime)
@@ -86,16 +91,22 @@
 
 ### Linting & Validation
 - **package-lint**: Package metadata and structure validation
-  - Checks: Package header compliance, dependency declarations
-  - Run via: Eask scripts
+  - Checks: Package header compliance, dependency declarations, package structure
+  - Run via: `eask lint package`
+  - CI Integration: Dedicated job on ubuntu-latest with Emacs 30.1
+  - Fails on warnings for strict quality control
 
 - **checkdoc**: Documentation string validation
-  - Checks: Docstring formatting, completeness
-  - Integration: CI pipeline
+  - Checks: Docstring formatting, completeness, style compliance
+  - Run via: `eask lint checkdoc`
+  - CI Integration: Dedicated job on ubuntu-latest with Emacs 30.1
+  - Fails on warnings to enforce documentation standards
 
 - **byte-compilation**: Emacs Lisp compilation checks
-  - Detects: Undefined functions, free variables
-  - Run via: Eask compile command
+  - Detects: Undefined functions, free variables, compilation warnings
+  - Run via: `eask compile --strict`
+  - CI Integration: Dedicated job on ubuntu-latest with Emacs 30.1
+  - Fails on warnings to catch potential runtime issues
 
 ---
 
@@ -103,18 +114,35 @@
 
 ### Continuous Integration
 - **GitHub Actions**: Automated testing and validation
-  - Workflows: Located in .github/workflows/
-  - Jobs:
-    - Multi-version Emacs testing (28.1, 29.x, 30.x)
-    - Linting with package-lint and checkdoc
-    - Byte-compilation checks
-    - Test execution with coverage reporting
-  - Triggers: Pull requests, pushes to main branches
+  - Workflows: Located in `.github/workflows/test.yml`
+  - Pipeline Structure:
+    - **Test Matrix**: 9 jobs (3 platforms × 3 Emacs versions)
+      - Platforms: ubuntu-latest, macos-latest, windows-latest
+      - Emacs Versions: 29.4, 30.1, snapshot
+      - Test Framework: buttercup via `eask test buttercup`
+      - Snapshot tests marked as experimental (allowed to fail)
+    - **Linting Jobs**: 3 parallel jobs on ubuntu-latest with Emacs 30.1
+      - package-lint: Package structure validation
+      - checkdoc: Documentation validation
+      - byte-compile: Compilation warnings check
+      - All configured with `fail-fast: false` to show all issues
+    - **Coverage Reporting**: Integrated with test matrix
+      - Runs on ubuntu-latest with Emacs 30.1 only
+      - Tool: undercover.el for line coverage tracking
+      - Display: GitHub Actions Job Summary (markdown table)
+      - PR Integration: Automatic PR comment updates via peter-evans/create-or-update-comment
+      - Error Handling: Non-blocking with graceful degradation
+  - Triggers: push to master, pull_request, workflow_dispatch
+  - Concurrency: cancel-in-progress enabled for efficiency
+  - Total CI Runtime: Typically under 10 minutes
 
 ### Aggregation Job
 - **all-checks-pass**: Meta-job ensuring all checks succeed
   - Purpose: Single required status check for PR merging
-  - Dependencies: All linting, testing, and compilation jobs
+  - Dependencies: [test, package-lint, checkdoc, byte-compile]
+  - Behavior: Always runs (even if dependencies fail) via `if: ${{ always() }}`
+  - Verification: Uses jq to check all dependent jobs succeeded
+  - Handles experimental test failures appropriately
 
 ---
 
