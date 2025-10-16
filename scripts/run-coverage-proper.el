@@ -5,11 +5,7 @@
 (setq load-path (cons (expand-file-name ".") load-path))
 (add-to-list 'load-path (expand-file-name "tests"))
 
-;; Note: When running via `eask emacs`, the elpa packages are already in load-path
-;; But buttercup and other test dependencies need to be required before loading test-helper
-(require 'buttercup)
-
-;; Load test helper first
+;; Load test helper first (it will require buttercup internally)
 (load-file "tests/test-helper.el")
 
 ;; Load undercover and enable it
