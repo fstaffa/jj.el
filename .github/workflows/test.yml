@@ -30,9 +30,6 @@ jobs:
           - os: macos-latest
             emacs-version: snapshot
             experimental: true
-          - os: windows-latest
-            emacs-version: snapshot
-            experimental: true
 
     steps:
       - uses: actions/checkout@v4

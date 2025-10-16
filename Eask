@@ -16,4 +16,5 @@
 (depends-on "s")
 (depends-on "transient" )
 (development
- (depends-on "buttercup"))
+ (depends-on "buttercup")
+ (depends-on "undercover"))
