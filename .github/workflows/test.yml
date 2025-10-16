@@ -57,11 +57,11 @@ jobs:
           # Run tests with undercover.el for coverage collection
           eask exec emacs --batch \
             -l undercover \
-            --eval '(setq undercover-force-coverage t)' \
+            --eval "(setq undercover-force-coverage t)" \
             -l jj.el \
             -l tests/test-helper.el \
             -l tests/test-jj.el \
-            --eval '(buttercup-run)' \
+            --eval "(buttercup-run)" \
             || true
 
       - name: Format coverage report
