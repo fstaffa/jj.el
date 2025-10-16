@@ -5,3 +5,5 @@ tmp/
 .jj
 .direnv
 .eask
+/coverage/
+*.elc
