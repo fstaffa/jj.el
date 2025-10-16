@@ -7,7 +7,7 @@
 
 (package-file "jj.el")
 
-(script "test" "echo \"Error: no test specified\" && exit 1")
+(script "test" "eask exec buttercup -L . -L tests tests/")
 
 (source "gnu")
 (source "melpa")
@@ -16,4 +16,5 @@
 (depends-on "s")
 (depends-on "transient" )
 (development
- (depends-on "buttercup"))
+ (depends-on "buttercup")
+ (depends-on "undercover"))
