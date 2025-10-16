@@ -55,14 +55,8 @@ jobs:
         continue-on-error: true
         run: |
           # Run tests with undercover.el for coverage collection
-          eask exec emacs --batch \
-            -l undercover \
-            --eval "(setq undercover-force-coverage t)" \
-            -l jj.el \
-            -l tests/test-helper.el \
-            -l tests/test-jj.el \
-            --eval "(buttercup-run)" \
-            || true
+          eask install-deps --dev || true
+          eask exec emacs --batch -l undercover --eval "(setq undercover-force-coverage t)" -l jj.el -l tests/test-helper.el -l tests/test-jj.el --eval "(buttercup-run)" || true
 
       - name: Format coverage report
         if: matrix.os == 'ubuntu-latest' && matrix.emacs-version == '30.1'
