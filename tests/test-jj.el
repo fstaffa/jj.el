@@ -29,8 +29,51 @@
 ;;   - jj--log-count-revs      Log revision counting tests
 ;;   - jj--run-command         Command execution tests
 ;;
-;; Test Patterns
-;; -------------
+;; Data-Driven Test Pattern
+;; -------------------------
+;;
+;; This test suite uses a data-driven approach to reduce duplication and
+;; improve maintainability. Test cases are defined as plist-based data
+;; tables, and `dolist` generates individual test cases.
+;;
+;; Pattern Structure:
+;;
+;;   (describe "function-name"
+;;     ;; Brief comment explaining what this suite tests
+;;     (let ((test-cases
+;;            '((:description "test case 1 description"
+;;               :key1 value1
+;;               :key2 value2
+;;               :expected expected-result-1)
+;;              (:description "test case 2 description"
+;;               :key1 value3
+;;               :key2 value4
+;;               :expected expected-result-2))))
+;;       (dolist (test-case test-cases)
+;;         (it (plist-get test-case :description)
+;;           ;; Test implementation using plist-get to extract values
+;;           (let ((value1 (plist-get test-case :key1))
+;;                 (expected (plist-get test-case :expected)))
+;;             (expect (function-under-test value1) :to-equal expected))))))
+;;
+;; Standard Plist Keys:
+;;   :description (string)     - Test case description for `it` block (required)
+;;   :expected (any)           - Expected result for assertion (required)
+;;   :fixture (string)         - Fixture filename from tests/fixtures/ directory
+;;   :output (string)          - Inline output string (alternative to :fixture)
+;;   :project-folder (string)  - Mock project folder path
+;;   :command (string)         - Command string if it varies per test
+;;   :revset (string)          - Revset argument for log functions
+;;   :verify-type (symbol)     - Verification type (e.g., 'command, 'directory)
+;;
+;; When to Use Fixtures vs Inline Data:
+;;   - Use :fixture for complex multi-line outputs (e.g., "sample-bookmarks.txt")
+;;   - Use :output for simple inline strings (e.g., "" or "main\n\n")
+;;   - Fixtures keep test tables cleaner for realistic command outputs
+;;   - Inline data is more readable for short test strings
+;;
+;; Testing Patterns
+;; ----------------
 ;;
 ;; Pattern 1: Testing parsing functions
 ;;   Use `jj-test-with-mocked-command` to provide sample output
@@ -42,32 +85,42 @@
 ;;   Mock `shell-command-to-string` to record command
 ;;   Verify command format matches expected jj command syntax
 ;;
-;; Pattern 3: Using fixture data
-;;   Load realistic jj output using `jj-test-load-fixture`
-;;   Use fixtures for complex multi-line outputs
-;;   Keep inline strings for simple single-line outputs
+;; Pattern 3: Fixture vs inline output selection
+;;   Use conditional logic to load fixture if :fixture key present
+;;   Otherwise use :output key for inline test data
+;;   This allows mixing fixture and inline data in the same test suite
 ;;
 ;; Adding New Tests
 ;; ----------------
 ;;
-;; When adding tests for new functions:
+;; To add a test case to an existing suite:
+;;
+;; 1. Add a new plist entry to the test-cases list
+;; 2. Include :description and :expected keys (required)
+;; 3. Add any function-specific keys (:fixture, :output, :command, etc.)
+;; 4. Run tests to verify: eask run script test
+;;
+;; Example - adding a test case to jj--bookmarks-get:
+;;
+;;   (describe "jj--bookmarks-get"
+;;     (let ((test-cases
+;;            '(;; ... existing test cases ...
+;;              (:description "should handle new scenario"
+;;               :output "new-bookmark\n"
+;;               :expected ("new-bookmark")))))  ;; <-- New case added
+;;       (dolist (test-case test-cases)
+;;         ;; ... existing test implementation ...
+;;         )))
+;;
+;; To create a test suite for a new function:
 ;;
 ;; 1. Create a new `describe` block for the function
-;; 2. Add tests that cover the main behavior
-;; 3. Use descriptive test names: "should [behavior] when [condition]"
-;; 4. Mock all external dependencies (commands, file system)
-;; 5. Keep tests focused and independent
-;; 6. Verify tests pass: eask run script test
-;;
-;; Example test structure:
-;;
-;;   (describe "jj--new-function"
-;;     (it "should parse output correctly"
-;;       (let ((cmd "jj --no-pager --color never new-command"))
-;;         (jj-test-with-mocked-command
-;;           (list (cons cmd "sample output"))
-;;           (jj-test-with-project-folder "/tmp/test"
-;;             (expect (jj--new-function) :to-equal "expected result"))))))
+;; 2. Define a test-cases list with plists for each scenario
+;; 3. Use `dolist` to iterate and generate `it` blocks
+;; 4. Extract values using `plist-get` in the test implementation
+;; 5. Mock all external dependencies (commands, file system)
+;; 6. Keep describe-level comments brief and informative
+;; 7. Verify tests pass: eask run script test
 
 ;;; Code:
 
@@ -82,21 +135,18 @@
 ;; Purpose: Extract the project directory name from the project folder path
 
 (describe "jj--get-project-name"
-  (it "should extract project name from path"
-    ;; Tests basic project name extraction
-    ;; Given: Project folder is /home/user/projects/my-repo/
-    ;; When: jj--get-project-name is called
-    ;; Then: Should return "my-repo"
-    (jj-test-with-project-folder "/home/user/projects/my-repo/"
-      (expect (jj--get-project-name) :to-equal "my-repo")))
-
-  (it "should handle path with trailing slash"
-    ;; Tests that trailing slash is handled correctly
-    ;; Given: Project folder has trailing slash
-    ;; When: jj--get-project-name is called
-    ;; Then: Should still extract correct project name
-    (jj-test-with-project-folder "/home/user/projects/test-project/"
-      (expect (jj--get-project-name) :to-equal "test-project"))))
+  ;; Test cases for project name extraction from various path formats
+  (let ((test-cases
+         '((:description "should extract project name from path"
+            :project-folder "/home/user/projects/my-repo/"
+            :expected "my-repo")
+           (:description "should handle path with trailing slash"
+            :project-folder "/home/user/projects/test-project/"
+            :expected "test-project"))))
+    (dolist (test-case test-cases)
+      (it (plist-get test-case :description)
+        (jj-test-with-project-folder (plist-get test-case :project-folder)
+          (expect (jj--get-project-name) :to-equal (plist-get test-case :expected)))))))
 
 ;; Test Suite: jj--bookmarks-get
 ;; ------------------------------
@@ -105,71 +155,52 @@
 ;; Purpose: Parse bookmark names from "jj bookmark list" command output
 
 (describe "jj--bookmarks-get"
-  (it "should parse multiple bookmarks from output"
-    ;; Tests parsing multiple bookmark names from fixture
-    ;; Given: jj bookmark list returns multiple bookmarks
-    ;; When: jj--bookmarks-get is called
-    ;; Then: Should return list of bookmark names
-    (let ((bookmark-output (jj-test-load-fixture "sample-bookmarks.txt"))
-          (cmd-string "jj --no-pager --color never bookmark list -T 'name ++ \"\n\"'"))
-      (jj-test-with-mocked-command
-        (list (cons cmd-string bookmark-output))
-        (jj-test-with-project-folder "/tmp/test"
-          (let ((bookmarks (jj--bookmarks-get)))
-            (expect bookmarks :to-equal '("dev-branch" "feature-branch" "main")))))))
-
-  (it "should handle empty bookmark list"
-    ;; Tests parsing when no bookmarks exist
-    ;; Given: jj bookmark list returns empty output
-    ;; When: jj--bookmarks-get is called
-    ;; Then: Should return empty list
-    (let ((cmd-string "jj --no-pager --color never bookmark list -T 'name ++ \"\n\"'"))
-      (jj-test-with-mocked-command
-        (list (cons cmd-string ""))
-        (jj-test-with-project-folder "/tmp/test"
-          (let ((bookmarks (jj--bookmarks-get)))
-            (expect bookmarks :to-equal nil))))))
-
-  (it "should handle bookmark output with whitespace"
-    ;; Tests parsing handles extra newlines/whitespace
-    ;; Given: jj bookmark list output contains extra whitespace
-    ;; When: jj--bookmarks-get is called
-    ;; Then: Should filter empty strings and return clean list
-    (let ((cmd-string "jj --no-pager --color never bookmark list -T 'name ++ \"\n\"'"))
-      (jj-test-with-mocked-command
-        (list (cons cmd-string "main\n\n"))
-        (jj-test-with-project-folder "/tmp/test"
-          (let ((bookmarks (jj--bookmarks-get)))
-            (expect bookmarks :to-equal '("main"))))))))
+  ;; Test cases for bookmark parsing with various command outputs
+  (let ((test-cases
+         '((:description "should parse multiple bookmarks from output"
+            :fixture "sample-bookmarks.txt"
+            :expected ("dev-branch" "feature-branch" "main"))
+           (:description "should handle empty bookmark list"
+            :output ""
+            :expected nil)
+           (:description "should handle bookmark output with whitespace"
+            :output "main\n\n"
+            :expected ("main"))))
+        (cmd-string "jj --no-pager --color never bookmark list -T 'name ++ \"\n\"'"))
+    (dolist (test-case test-cases)
+      (it (plist-get test-case :description)
+        (let* ((output (if (plist-get test-case :fixture)
+                          (jj-test-load-fixture (plist-get test-case :fixture))
+                        (plist-get test-case :output))))
+          (jj-test-with-mocked-command
+            (list (cons cmd-string output))
+            (jj-test-with-project-folder "/tmp/test"
+              (expect (jj--bookmarks-get) :to-equal (plist-get test-case :expected)))))))))
 
 ;; Test Suite: jj--log-count-revs
 ;; -------------------------------
-;; Tests revision counting from jj log output.
-;; Function: jj--log-count-revs
-;; Purpose: Count number of revisions in a given revset by counting characters
+;; Test cases for revision counting from log output
 
 (describe "jj--log-count-revs"
-  (it "should count revisions from log output correctly"
-    ;; Tests counting revisions from log output
-    ;; Given: jj log returns "aaa" (3 revisions with template "a")
-    ;; When: jj--log-count-revs is called with a revset
-    ;; Then: Should return 3 (length of output)
-    (let ((cmd-string "jj --no-pager --color never log -T '\"a\"' --revisions \"trunk()..main\" --no-graph"))
-      (jj-test-with-mocked-command
-        (list (cons cmd-string "aaa"))
-        (jj-test-with-project-folder "/tmp/test"
-          (expect (jj--log-count-revs "trunk()..main") :to-equal 3)))))
-
-  (it "should handle empty log output as zero revisions"
-    ;; Tests counting when revset is empty
-    ;; Given: jj log returns empty string (no revisions)
-    ;; When: jj--log-count-revs is called
-    ;; Then: Should return 0
-    (let ((cmd-string "jj --no-pager --color never log -T '\"a\"' --revisions \"trunk()..main\" --no-graph"))
-      (jj-test-with-mocked-command
-        (list (cons cmd-string ""))
-        (jj-test-with-project-folder "/tmp/test"
-          (expect (jj--log-count-revs "trunk()..main") :to-equal 0))))))
+  (let ((test-cases
+         '((:description "should count revisions from log output correctly"
+            :revset "trunk()..main"
+            :output "aaa"
+            :expected 3)
+           (:description "should handle empty log output as zero revisions"
+            :revset "trunk()..main"
+            :output ""
+            :expected 0))))
+    (dolist (test-case test-cases)
+      (it (plist-get test-case :description)
+        (let* ((revset (plist-get test-case :revset))
+               (output (plist-get test-case :output))
+               (expected (plist-get test-case :expected))
+               (cmd-string (format "jj --no-pager --color never log -T '\"a\"' --revisions \"%s\" --no-graph" revset)))
+          (jj-test-with-mocked-command
+            (list (cons cmd-string output))
+            (jj-test-with-project-folder "/tmp/test"
+              (expect (jj--log-count-revs revset) :to-equal expected))))))))
 
 ;; Test Suite: jj--run-command
 ;; ----------------------------
@@ -178,32 +209,31 @@
 ;; Purpose: Execute jj commands from project root with standard arguments
 
 (describe "jj--run-command"
-  (it "should construct command with proper arguments"
-    ;; Tests that jj--run-command builds correct command string
-    ;; Given: A simple command like "status"
-    ;; When: jj--run-command is called
-    ;; Then: Should construct "jj --no-pager --color never status"
-    (let ((captured-command nil))
-      (cl-letf (((symbol-function 'shell-command-to-string)
-                 (lambda (cmd)
-                   (setq captured-command cmd)
-                   "test output")))
-        (jj-test-with-project-folder "/tmp/test"
-          (jj--run-command "status")
-          (expect captured-command :to-equal "jj --no-pager --color never status")))))
-
-  (it "should execute command from project folder"
-    ;; Tests that commands execute from correct directory
-    ;; Given: Project folder is set to specific directory
-    ;; When: jj--run-command is called
-    ;; Then: default-directory should be set to project folder
-    (let ((captured-directory nil))
-      (cl-letf (((symbol-function 'shell-command-to-string)
-                 (lambda (_cmd)
-                   (setq captured-directory default-directory)
-                   "test output")))
-        (jj-test-with-project-folder "/tmp/test-project/"
-          (jj--run-command "status")
-          (expect captured-directory :to-equal "/tmp/test-project/"))))))
+  ;; Test cases for command construction and execution context
+  (let ((test-cases
+         '((:description "should construct command with proper arguments"
+            :command "status"
+            :project-folder "/tmp/test"
+            :verify-type command
+            :expected "jj --no-pager --color never status")
+           (:description "should execute command from project folder"
+            :command "status"
+            :project-folder "/tmp/test-project/"
+            :verify-type directory
+            :expected "/tmp/test-project/"))))
+    (dolist (test-case test-cases)
+      (it (plist-get test-case :description)
+        (let ((captured-command nil)
+              (captured-directory nil))
+          (cl-letf (((symbol-function 'shell-command-to-string)
+                     (lambda (cmd)
+                       (setq captured-command cmd)
+                       (setq captured-directory default-directory)
+                       "test output")))
+            (jj-test-with-project-folder (plist-get test-case :project-folder)
+              (jj--run-command (plist-get test-case :command))
+              (if (eq (plist-get test-case :verify-type) 'command)
+                  (expect captured-command :to-equal (plist-get test-case :expected))
+                (expect captured-directory :to-equal (plist-get test-case :expected))))))))))
 
 ;;; test-jj.el ends here
