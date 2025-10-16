@@ -120,7 +120,9 @@
   "Temporary directory path for current test.")
 
 (defvar jj-test--fixtures-dir
-  "/home/mathematician314/data/personal/jj.el/tests/fixtures/"
+  (expand-file-name "fixtures/"
+                    (file-name-directory
+                     (or load-file-name buffer-file-name)))
   "Absolute path to test fixtures directory.")
 
 (defmacro jj-test-with-mocked-command (command-to-output &rest body)
