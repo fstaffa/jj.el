@@ -26,13 +26,13 @@ if [[ ! -f "$COVERAGE_FILE" ]]; then
 fi
 
 # Parse coverage data using jq
-# SimpleCov JSON format: .RSpec.coverage contains file paths as keys
+# undercover.el JSON format: .["undercover.el"].coverage contains file paths as keys
 # Each file has an array of line coverage (null = not executable, 0 = not covered, N = covered N times)
 
 # Extract overall coverage percentage and per-file breakdown
 OUTPUT=$(jq -r '
-  # Get the RSpec coverage data
-  .RSpec.coverage as $coverage |
+  # Get the undercover.el coverage data (try both undercover.el and RSpec keys for compatibility)
+  (.["undercover.el"].coverage // .RSpec.coverage) as $coverage |
 
   # Calculate per-file statistics
   [

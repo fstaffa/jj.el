@@ -18,8 +18,6 @@
 ;; status, log, describe, new, fetch, and push through an intuitive interface.
 ;;; Code:
 
-;; Declare optional functions from external packages to silence byte-compiler warnings
-(declare-function evil-define-key "evil-core")
 
 (require 's)
 (require 'transient)
@@ -267,13 +265,4 @@
 (define-key jj-status-mode-map (kbd "l") #'jj-status-log-popup)
 (define-key jj-status-mode-map (kbd "?") #'jj-status-popup)
 
-;; Optional integration with evil mode
-(when (and (boundp 'evil-mode) (fboundp 'evil-define-key))
-  (evil-define-key 'normal jj-status-mode-map (kbd "q") #'jj-window-quit)
-  (evil-define-key 'normal jj-status-mode-map (kbd "l") #'jj-status-log-popup)
-  (evil-define-key 'normal jj-status-mode-map (kbd "?") #'jj-status-popup))
-
-;; Optional integration with Doom Emacs
-;; Note: Doom users should add this to their config.el instead:
-;; (map! :leader :desc "jujutsu status" "j s" #'jj-status)
 ;;; jj.el ends here

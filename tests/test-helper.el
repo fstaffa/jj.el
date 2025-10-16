@@ -105,17 +105,6 @@
 (require 'buttercup)
 (require 'cl-lib)
 
-;; Stub optional dependencies to avoid loading errors
-(unless (fboundp 'evil-define-key)
-  (defun evil-define-key (&rest _args)
-    "Stub for evil-define-key to avoid loading errors during testing."
-    nil))
-
-(unless (fboundp 'map!)
-  (defmacro map! (&rest _args)
-    "Stub for doom-emacs map! macro to avoid loading errors during testing."
-    nil))
-
 (defvar jj-test--temp-dir nil
   "Temporary directory path for current test.")
 
