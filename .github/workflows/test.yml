@@ -64,16 +64,6 @@ jobs:
           # Run tests with coverage using the eask coverage script
           eask run script coverage || true
 
-      - name: Debug coverage output
-        if: matrix.os == 'ubuntu-latest' && matrix.emacs-version == '30.1'
-        continue-on-error: true
-        run: |
-          echo "=== Coverage directory contents ==="
-          ls -la coverage/ || echo "Coverage directory does not exist"
-          echo ""
-          echo "=== Coverage file contents (if exists) ==="
-          cat coverage/.resultset.json 2>/dev/null || echo "Coverage file does not exist"
-
       - name: Format coverage report
         if: matrix.os == 'ubuntu-latest' && matrix.emacs-version == '30.1'
         continue-on-error: true
