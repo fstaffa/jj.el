@@ -8,15 +8,18 @@
 ;; Modified: February 28, 2025
 ;; Version: 0.0.1
 ;; Package-Requires: ((emacs "28.1") (s "1.13.0") (transient "0.8.0"))
-;; Keywords: jj jujutsu vcs
+;; Keywords: vc
 ;; URL: https://github.com/fstaffa/jj.el
 ;; This file is not part of GNU Emacs.
 ;;
 ;;; Commentary:
-;;
+;; This package provides Emacs integration for jujutsu (jj), a Git-compatible
+;; version control system. It offers commands for common jj operations like
+;; status, log, describe, new, fetch, and push through an intuitive interface.
 ;;; Code:
 
-
+;; Declare optional functions from external packages to silence byte-compiler warnings
+(declare-function evil-define-key "evil-core")
 
 (require 's)
 (require 'transient)
@@ -129,8 +132,7 @@
         (erase-buffer)
         (insert (jj--run-command cmd))
         (jj-status-mode)))
-    (switch-to-buffer buffer))
-  )
+    (switch-to-buffer buffer)))
 
 (defun jj--revset-read (&rest _args)
   "Read revset from user."
@@ -167,8 +169,7 @@
       (user-error (format "Invalid revision %s" rev)))
     (transient-setup transient-current-command nil nil :scope scope)
     (message "Added %s" rev)
-    (message "Parents: %s" scope)
-    ))
+    (message "Parents: %s" scope)))
 
 (transient-define-suffix jj--new-parent-revisions-clear ()
   "Clear list of parent revisions."
@@ -265,8 +266,14 @@
 (define-key jj-status-mode-map (kbd "q") #'jj-window-quit)
 (define-key jj-status-mode-map (kbd "l") #'jj-status-log-popup)
 (define-key jj-status-mode-map (kbd "?") #'jj-status-popup)
-(evil-define-key 'normal jj-status-mode-map (kbd "q") #'jj-window-quit)
-(evil-define-key 'normal jj-status-mode-map (kbd "l") #'jj-status-log-popup)
-(evil-define-key 'normal jj-status-mode-map (kbd "?") #'jj-status-popup)
-(map! :leader :desc "jujutsu status" "j s" #'jj-status)
+
+;; Optional integration with evil mode
+(when (and (boundp 'evil-mode) (fboundp 'evil-define-key))
+  (evil-define-key 'normal jj-status-mode-map (kbd "q") #'jj-window-quit)
+  (evil-define-key 'normal jj-status-mode-map (kbd "l") #'jj-status-log-popup)
+  (evil-define-key 'normal jj-status-mode-map (kbd "?") #'jj-status-popup))
+
+;; Optional integration with Doom Emacs
+;; Note: Doom users should add this to their config.el instead:
+;; (map! :leader :desc "jujutsu status" "j s" #'jj-status)
 ;;; jj.el ends here
