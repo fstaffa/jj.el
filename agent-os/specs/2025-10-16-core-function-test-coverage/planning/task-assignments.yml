@@ -1,0 +1,12 @@
+task_assignments:
+  - task_group: "Task Group 1: User Interaction Mocking Helper"
+    assigned_subagent: "testing-engineer"
+
+  - task_group: "Task Group 2: Error and Edge Case Fixtures"
+    assigned_subagent: "testing-engineer"
+
+  - task_group: "Task Group 3: Project Detection and Command Execution Tests"
+    assigned_subagent: "testing-engineer"
+
+  - task_group: "Task Group 4: Coverage Analysis and Strategic Gap Filling"
+    assigned_subagent: "testing-engineer"
