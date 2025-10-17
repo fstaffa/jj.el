@@ -206,8 +206,14 @@ Usage Notes:
                                 (stdout (plist-get (cddr spec) :stdout))
                                 (stderr (plist-get (cddr spec) :stderr)))
                             (when destination
-                              (let ((stdout-buf (if (listp destination) (car destination) destination))
-                                    (stderr-buf (when (listp destination) (cadr destination))))
+                              (let ((stdout-buf (cond
+                                                 ;; Cons cell: (stdout . stderr)
+                                                 ((consp destination) (car destination))
+                                                 ;; Single buffer
+                                                 (t destination)))
+                                    (stderr-buf (when (consp destination)
+                                                  ;; For cons cell, cdr is the stderr buffer
+                                                  (cdr destination))))
                                 (when stdout-buf
                                   (with-current-buffer stdout-buf
                                     (insert stdout)))

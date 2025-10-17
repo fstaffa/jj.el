@@ -11,7 +11,7 @@
 ;; Test Coverage Summary
 ;; ---------------------
 ;;
-;; Total test count: 64 tests
+;; Total test count: 61 tests
 ;; Critical function coverage: 100%
 ;; Overall line coverage: 80%+
 ;; Execution time: <2 seconds
@@ -56,6 +56,7 @@
 ;;   - jj--bookmarks-get       Bookmark parsing tests
 ;;   - jj--log-count-revs      Log revision counting tests
 ;;   - jj--run-command         Command execution tests
+;;   - Regression Tests        Cons cell format regression test
 ;;   - jj-test-with-user-input User interaction mocking smoke tests
 ;;   - jj--get-project-folder  Project detection tests
 ;;   - jj-status               Status buffer creation tests
@@ -305,8 +306,14 @@
                        (setq captured-command (cons program args))
                        (setq captured-directory default-directory)
                        (when destination
-                         (let ((stdout-buf (if (listp destination) (car destination) destination))
-                               (stderr-buf (when (listp destination) (cadr destination))))
+                         (let ((stdout-buf (cond
+                                            ;; Cons cell: (stdout . stderr)
+                                            ((consp destination) (car destination))
+                                            ;; Single buffer
+                                            (t destination)))
+                               (stderr-buf (when (consp destination)
+                                             ;; For cons cell, cdr is the stderr buffer
+                                             (cdr destination))))
                            (when stdout-buf
                              (with-current-buffer stdout-buf
                                (insert stdout)))
@@ -328,6 +335,57 @@
                 (expect (member "--no-pager" (cdr captured-command)) :to-be-truthy)
                 (expect (member "--color" (cdr captured-command)) :to-be-truthy)
                 (expect (member "never" (cdr captured-command)) :to-be-truthy)))))))))
+
+;; Regression Test: Cons Cell Format for call-process DESTINATION
+;; ---------------------------------------------------------------
+;; This test prevents regression of the "Wrong type argument: stringp, #<killed buffer>" bug
+;;
+;; Bug History:
+;;   - jj--run-command uses (cons stdout-buffer stderr-buffer) for call-process DESTINATION
+;;   - Old test mocks used (listp destination) which returns true for cons cells
+;;   - Then incorrectly used (cadr destination) instead of (cdr destination) for stderr
+;;   - This caused "Wrong type argument: listp, #<killed buffer>" in interactive usage
+;;
+;; This test validates:
+;;   1. call-process receives DESTINATION as a cons cell (not a list)
+;;   2. Both stdout and stderr are captured separately using cons cell format
+;;   3. The implementation correctly uses (car destination) and (cdr destination)
+;;
+(describe "Regression - call-process cons cell format"
+  (it "should pass cons cell (not list) to call-process for stdout/stderr separation"
+    (let ((captured-destination nil)
+          (captured-destination-type nil)
+          (stdout-content "test output")
+          (stderr-content "test warning"))
+      (cl-letf (((symbol-function 'call-process)
+                 (lambda (program infile destination _display &rest args)
+                   ;; Capture the destination parameter and its type
+                   (setq captured-destination destination)
+                   (setq captured-destination-type
+                         (cond
+                          ((consp destination) 'cons-cell)
+                          ((listp destination) 'list)
+                          (t 'other)))
+                   ;; Populate buffers if destination is a cons cell
+                   (when (consp destination)
+                     (let ((stdout-buf (car destination))
+                           (stderr-buf (cdr destination)))
+                       (when stdout-buf
+                         (with-current-buffer stdout-buf
+                           (insert stdout-content)))
+                       (when stderr-buf
+                         (with-current-buffer stderr-buf
+                           (insert stderr-content)))))
+                   0)))
+        (jj-test-with-project-folder "/tmp/test"
+          (let ((result (jj--run-command "status")))
+            ;; Verify destination is a cons cell, not a list
+            (expect captured-destination-type :to-be 'cons-cell)
+            ;; Verify both stdout and stderr were captured correctly
+            (expect (cadr result) :to-equal stdout-content)  ;; stdout
+            (expect (caddr result) :to-equal stderr-content) ;; stderr
+            ;; Verify the cons cell structure
+            (expect (consp captured-destination) :to-be t)))))))
 
 ;; Test Suite: jj-test-with-user-input
 ;; ------------------------------------

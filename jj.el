@@ -91,12 +91,12 @@ where success-flag is t if exit-code is 0, nil otherwise."
                            (split-string command))))
     (unwind-protect
         (progn
+          ;; Call call-process with explicit argument list to avoid apply issues
           (setq exit-code
-                (apply #'call-process
-                       "jj" nil
-                       (list stdout-buffer stderr-buffer)
-                       nil
-                       cmd-args))
+                (let ((destination (cons stdout-buffer stderr-buffer)))
+                  (apply #'call-process
+                         (append (list "jj" nil destination nil)
+                                 cmd-args))))
           (setq stdout (with-current-buffer stdout-buffer (buffer-string)))
           (setq stderr (with-current-buffer stderr-buffer (buffer-string)))
           (jj--debug-log "Exit code: %d (%s)" exit-code (if (zerop exit-code) "success" "failure"))
