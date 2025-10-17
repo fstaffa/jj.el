@@ -20,7 +20,7 @@ The following features are already functional in jj.el:
 
 2. [x] **CI/CD Pipeline** - Configure GitHub Actions workflow for automated testing on multiple Emacs versions (28.1, 29.x, 30.x), linting with package-lint and checkdoc, and automated test reporting on pull requests. `M`
 
-3. [ ] **Core Function Test Coverage** - Write comprehensive tests for existing core utilities: project detection (jj--get-project-folder), command execution (jj--run-command), buffer management, and error handling paths. Aim for 80%+ coverage of critical functions. `L`
+3. [x] **Core Function Test Coverage** - Write comprehensive tests for existing core utilities: project detection (jj--get-project-folder), command execution (jj--run-command), buffer management, and error handling paths. Aim for 80%+ coverage of critical functions. `L`
 
 4. [ ] **Error Handling Standardization** - Implement consistent error handling across all jj CLI invocations with user-friendly error messages, logging for debugging, and graceful degradation when jj commands fail. `S`
 

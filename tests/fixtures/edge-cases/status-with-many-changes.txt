@@ -1,0 +1,28 @@
+Working copy changes:
+A src/component1.js
+A src/component2.js
+A src/component3.js
+A src/component4.js
+A src/component5.js
+M src/main.js
+M src/utils.js
+M src/config.js
+M tests/test1.js
+M tests/test2.js
+M tests/test3.js
+D old/deprecated1.js
+D old/deprecated2.js
+D old/deprecated3.js
+A docs/api.md
+A docs/guide.md
+M README.md
+M package.json
+M package-lock.json
+A .gitignore
+M src/styles/main.css
+M src/styles/theme.css
+A src/lib/helper1.js
+A src/lib/helper2.js
+M tests/integration/test-suite.js
+Working copy  (@) : vykrrxmx e9d0887a Large refactoring with many changes
+Parent commit (@-): wpmvlnzv 074d0cdd main | Previous commit
