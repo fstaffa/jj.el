@@ -285,8 +285,8 @@ Example:
 INPUT: Raw jj status output string showing file changes.
 Expected format:
   Working copy changes:
-  A  file1.txt
-  M  file2.txt
+  A file1.txt
+  M file2.txt
   ...
 
 RETURNS: List of file plists with structure:
@@ -307,9 +307,9 @@ Example:
          ((string-match-p "Working copy changes:" line)
           (setq in-changes-section t))
 
-         ;; Parse file status lines (STATUS  PATH)
+         ;; Parse file status lines (STATUS PATH)
          ((and in-changes-section
-               (string-match "\\`\\([AMRI?]\\)  \\(.+\\)\\'" line))
+               (string-match "\\`\\([AMRI?]\\) \\(.+\\)\\'" line))
           (let ((status (match-string 1 line))
                 (path (match-string 2 line)))
             (push (list :path path :status status) files)))))
