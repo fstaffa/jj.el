@@ -23,6 +23,25 @@
 (require 'transient)
 (provide 'jj)
 
+;;; Configuration Variables
+
+(defcustom jj-debug-mode nil
+  "Enable debug logging for jj command execution.
+When non-nil, log detailed information about command execution
+to the *Messages* buffer, including commands run, exit codes,
+and stderr output."
+  :type 'boolean
+  :group 'jj)
+
+(defcustom jj-error-buffer-name "*jj-errors*"
+  "Name of the buffer used to store detailed error context.
+This buffer accumulates error information including timestamps,
+commands, exit codes, and stderr/stdout output for debugging
+purposes."
+  :type 'string
+  :group 'jj)
+
+;;; Project Folder Management
 
 (defun jj--get-project-folder ()
   (locate-dominating-file default-directory ".jj" ))
@@ -38,6 +57,7 @@
   (interactive)
   (quit-window))
 
+;;; Major Mode Definition
 
 (define-derived-mode jj-status-mode special-mode "jj-status"
   "Major mode for displaying Jujutsu status."
@@ -45,32 +65,142 @@
   :
   (setq buffer-read-only t))
 
+;;; Debug Logging
+
+(defun jj--debug-log (format-string &rest args)
+  "Log a debug message to *Messages* buffer when `jj-debug-mode' is enabled.
+FORMAT-STRING and ARGS are passed to `format' to construct the message.
+Messages are prefixed with \"[jj-debug]\" for easy filtering."
+  (when jj-debug-mode
+    (apply #'message (concat "[jj-debug] " format-string) args)))
+
+;;; Command Execution Infrastructure
+
 (defun jj--run-command (command)
-  "Run a jj COMMAND from the project root"
+  "Run a jj COMMAND from the project root.
+Returns a list: (success-flag stdout stderr exit-code)
+where success-flag is t if exit-code is 0, nil otherwise."
+  (jj--debug-log "Command: jj %s" command)
   (let* ((default-directory (jj--get-project-folder))
-         (jj-cmds (list "jj" "--no-pager" "--color" "never" command))
-         (cmd-string (s-join " " jj-cmds)))
-    (message cmd-string)
-    (shell-command-to-string cmd-string)))
+         (stdout-buffer (generate-new-buffer " *jj-stdout*"))
+         (stderr-buffer (generate-new-buffer " *jj-stderr*"))
+         (exit-code nil)
+         (stdout "")
+         (stderr "")
+         (cmd-args (append '("--no-pager" "--color" "never")
+                           (split-string command))))
+    (unwind-protect
+        (progn
+          (setq exit-code
+                (apply #'call-process
+                       "jj" nil
+                       (list stdout-buffer stderr-buffer)
+                       nil
+                       cmd-args))
+          (setq stdout (with-current-buffer stdout-buffer (buffer-string)))
+          (setq stderr (with-current-buffer stderr-buffer (buffer-string)))
+          (jj--debug-log "Exit code: %d (%s)" exit-code (if (zerop exit-code) "success" "failure"))
+          (when (not (string-empty-p stderr))
+            (jj--debug-log "Stderr: %s" stderr))
+          (list (zerop exit-code) stdout stderr exit-code))
+      (kill-buffer stdout-buffer)
+      (kill-buffer stderr-buffer))))
+
+;;; Error Handling Functions
+
+(defun jj--validate-repository ()
+  "Validate that the current directory is within a jj repository.
+Returns the project folder path if valid.
+Signals `user-error' if not in a jj repository."
+  (let ((project-folder (jj--get-project-folder)))
+    (unless project-folder
+      (jj--debug-log "Repository validation failed: not in a jj repository")
+      (user-error "Not in a jj repository"))
+    project-folder))
+
+(defun jj--write-error-buffer (command exit-code stderr stdout)
+  "Write detailed error context to the error buffer.
+COMMAND is the jj command that failed.
+EXIT-CODE is the exit code returned by the command.
+STDERR is the stderr output from the command.
+STDOUT is the stdout output from the command."
+  (let ((error-buffer (get-buffer-create jj-error-buffer-name)))
+    (with-current-buffer error-buffer
+      (goto-char (point-max))
+      (insert (format "===============================================================================\n"))
+      (insert (format "Error at: %s\n" (format-time-string "%Y-%m-%d %H:%M:%S")))
+      (insert (format "===============================================================================\n\n"))
+      (insert (format "Command: jj %s\n" command))
+      (insert (format "Exit Code: %d\n\n" exit-code))
+      (insert (format "--- Stderr ---\n%s\n" (if (string-empty-p stderr) "<empty>" stderr)))
+      (insert (format "--- Stdout ---\n%s\n" (if (string-empty-p stdout) "<empty>" stdout)))
+      (insert (format "===============================================================================\n\n")))))
+
+(defun jj--handle-command-error (command exit-code stderr stdout)
+  "Handle command errors by categorizing and signaling appropriate error type.
+COMMAND is the jj command that failed.
+EXIT-CODE is the exit code returned by the command.
+STDERR is the stderr output from the command.
+STDOUT is the stdout output from the command.
+
+Error categorization:
+- User errors (exit codes 1-2 or 'invalid' in stderr): signals `user-error'
+- Command failures (exit codes 1-255): signals `error'
+- System errors (binary not found): signals `error'"
+  ;; Log error handling
+  (jj--debug-log "Handling command error: command=%s exit-code=%d" command exit-code)
+
+  ;; Write error context to buffer before signaling
+  (jj--write-error-buffer command exit-code stderr stdout)
+
+  ;; Categorize and signal appropriate error
+  (cond
+   ;; User errors: exit codes 1-2 or "invalid" in stderr
+   ((or (and (>= exit-code 1) (<= exit-code 2))
+        (string-match-p "invalid" stderr))
+    (jj--debug-log "Error type: user-error")
+    (user-error "jj command failed: %s (exit code %d)" command exit-code))
+
+   ;; Command failures: all other non-zero exit codes
+   (t
+    (jj--debug-log "Error type: command-failure")
+    (error "jj command failed: %s (exit code %d)" command exit-code))))
+
+;;; User-Facing Commands
 
 (defun jj-status ()
   "Display the status of the current jj repository."
   (interactive)
-  (let ((buffer (get-buffer-create (format "jj: %s" (jj--get-project-name)))))
-    (with-current-buffer buffer
-      (let ((inhibit-read-only t))
-        (erase-buffer)
-        (insert (jj--run-command "status"))
-        (jj-status-mode)))
-    (switch-to-buffer buffer)))
+  (jj--validate-repository)
+  (let* ((result (jj--run-command "status"))
+         (success (car result))
+         (stdout (cadr result))
+         (stderr (caddr result))
+         (exit-code (cadddr result)))
+    (if success
+        (let ((buffer (get-buffer-create (format "jj: %s" (jj--get-project-name)))))
+          (with-current-buffer buffer
+            (let ((inhibit-read-only t))
+              (erase-buffer)
+              (insert stdout)
+              (jj-status-mode)))
+          (switch-to-buffer buffer))
+      (jj--handle-command-error "status" exit-code stderr stdout))))
 
 
 (defun jj-status-describe (args)
   "Run jj describe with ARGS."
   (interactive (list (transient-args 'jj-status-describe-popup)))
-  (let* ((cmd (concat "describe " (string-join args " "))))
-    (jj--run-command cmd)
-    (jj-status)))
+  (jj--validate-repository)
+  (let* ((cmd (concat "describe " (string-join args " ")))
+         (result (jj--run-command cmd))
+         (success (car result))
+         (stdout (cadr result))
+         (stderr (caddr result))
+         (exit-code (cadddr result)))
+    (if success
+        (jj-status)
+      (jj--handle-command-error cmd exit-code stderr stdout))))
 
 (transient-define-prefix jj-status-describe-popup ()
   "Popup for jujutsu describe comand."
@@ -80,13 +210,23 @@
    ("d" "Describe" jj-status-describe)])
 
 (defun jj--log-count-revs (revset)
-  "Count number of revisions in log."
-  (let ((log (jj--run-command (format "log -T '\"a\"' --revisions \"%s\" --no-graph" revset))))
-    (length log)))
+  "Count number of revisions in log for REVSET."
+  (jj--validate-repository)
+  (let* ((result (jj--run-command (format "log -T '\"a\"' --revisions \"%s\" --no-graph" revset)))
+         (success (car result))
+         (stdout (cadr result))
+         (stderr (caddr result))
+         (exit-code (cadddr result)))
+    (if success
+        (length stdout)
+      (jj--handle-command-error
+       (format "log -T '\"a\"' --revisions \"%s\" --no-graph" revset)
+       exit-code stderr stdout))))
 
 (defun jj--status-abandon-revset-from-trunk ()
   "Prompt for branch name and create revset from trunk."
   (interactive)
+  (jj--validate-repository)
   (let* ((jj-current-revset
           (format "trunk()..%s"
                   (jj--bookmarks-select)))
@@ -95,8 +235,16 @@
         (jj-status-abandon (append (list (format "\"%s\""  jj-current-revset)))))))
 
 (defun jj--bookmarks-get ()
-  (let ((bookmarks (jj--run-command "bookmark list -T 'name ++ \"\n\"'")))
-    (s-split "\n" bookmarks 't)))
+  "Get list of bookmarks from jj repository."
+  (jj--validate-repository)
+  (let* ((result (jj--run-command "bookmark list -T 'name ++ \"\n\"'"))
+         (success (car result))
+         (stdout (cadr result))
+         (stderr (caddr result))
+         (exit-code (cadddr result)))
+    (if success
+        (s-split "\n" stdout 't)
+      (jj--handle-command-error "bookmark list -T 'name ++ \"\n\"'" exit-code stderr stdout))))
 
 (defun jj--bookmarks-select ()
   "Select bookmark from jj."
@@ -106,9 +254,16 @@
 (defun jj-status-abandon (args)
   "Run jj abandon with ARGS."
   (interactive (list (transient-args 'jj-status-abandon-popup)))
-  (let* ((cmd (concat "abandon " (string-join args " "))))
-    (jj--run-command cmd)
-    (jj-status)))
+  (jj--validate-repository)
+  (let* ((cmd (concat "abandon " (string-join args " ")))
+         (result (jj--run-command cmd))
+         (success (car result))
+         (stdout (cadr result))
+         (stderr (caddr result))
+         (exit-code (cadddr result)))
+    (if success
+        (jj-status)
+      (jj--handle-command-error cmd exit-code stderr stdout))))
 
 (transient-define-prefix jj-status-abandon-popup ()
   "Popup for jujutsu abandon comand."
@@ -124,13 +279,21 @@
 (defun jj--log-show (cmd)
   "Show log for given CMD."
   (interactive)
-  (let ((buffer (get-buffer-create (format "jj log: %s" (jj--get-project-name)))))
-    (with-current-buffer buffer
-      (let ((inhibit-read-only t))
-        (erase-buffer)
-        (insert (jj--run-command cmd))
-        (jj-status-mode)))
-    (switch-to-buffer buffer)))
+  (jj--validate-repository)
+  (let* ((result (jj--run-command cmd))
+         (success (car result))
+         (stdout (cadr result))
+         (stderr (caddr result))
+         (exit-code (cadddr result)))
+    (if success
+        (let ((buffer (get-buffer-create (format "jj log: %s" (jj--get-project-name)))))
+          (with-current-buffer buffer
+            (let ((inhibit-read-only t))
+              (erase-buffer)
+              (insert stdout)
+              (jj-status-mode)))
+          (switch-to-buffer buffer))
+      (jj--handle-command-error cmd exit-code stderr stdout))))
 
 (defun jj--revset-read (&rest _args)
   "Read revset from user."
@@ -184,9 +347,16 @@
 (defun jj--new (args)
   "Run jj new with ARGS."
   (interactive (list (transient-args 'jj-status-new-popup)))
-  (let* ((cmd (string-join (append '("new") (transient-scope) args) " ")))
-    (jj--run-command cmd)
-    (jj-status)))
+  (jj--validate-repository)
+  (let* ((cmd (string-join (append '("new") (transient-scope) args) " "))
+         (result (jj--run-command cmd))
+         (success (car result))
+         (stdout (cadr result))
+         (stderr (caddr result))
+         (exit-code (cadddr result)))
+    (if success
+        (jj-status)
+      (jj--handle-command-error cmd exit-code stderr stdout))))
 
 (transient-define-prefix jj-status-new-popup ()
   "Popup for jujutsu new command."
@@ -210,10 +380,18 @@
 (defun jj--fetch (args)
   "Run jj fetch with ARGS."
   (interactive (list (transient-args 'jj-fetch-popup)))
-  (let* ((cmd (string-join (append '("git fetch") args) " ")))
-    (jj--run-command cmd)
-    (message "Successfully fetched")
-    (jj-status)))
+  (jj--validate-repository)
+  (let* ((cmd (string-join (append '("git fetch") args) " "))
+         (result (jj--run-command cmd))
+         (success (car result))
+         (stdout (cadr result))
+         (stderr (caddr result))
+         (exit-code (cadddr result)))
+    (if success
+        (progn
+          (message "Successfully fetched")
+          (jj-status))
+      (jj--handle-command-error cmd exit-code stderr stdout))))
 
 (transient-define-prefix jj-fetch-popup ()
   "Popup for jujutsu git fetch command"
@@ -229,9 +407,16 @@
 (defun jj--push (args)
   "Run jj push with ARGS."
   (interactive (list (transient-args 'jj-push-popup)))
-  (let* ((cmd (string-join (append '("git push") args) " ")))
-    (jj--run-command cmd)
-    (jj-status)))
+  (jj--validate-repository)
+  (let* ((cmd (string-join (append '("git push") args) " "))
+         (result (jj--run-command cmd))
+         (success (car result))
+         (stdout (cadr result))
+         (stderr (caddr result))
+         (exit-code (cadddr result)))
+    (if success
+        (jj-status)
+      (jj--handle-command-error cmd exit-code stderr stdout))))
 
 (transient-define-prefix jj-push-popup ()
   "Popup for jujutsu git push command"
