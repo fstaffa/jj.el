@@ -8,7 +8,7 @@
 ;; Modified: February 28, 2025
 ;; Version: 0.0.1
 ;; Package-Requires: ((emacs "28.1") (s "1.13.0") (transient "0.8.0"))
-;; Keywords: vc
+;; Keywords: vc jj jujutsu vcs
 ;; URL: https://github.com/fstaffa/jj.el
 ;; This file is not part of GNU Emacs.
 ;;
