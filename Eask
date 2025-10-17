@@ -3,7 +3,7 @@
          "Integration with jujutsu version control system")
 
 (website-url "https://github.com/fstaffa/jj.el")
-(keywords "jj" "jujutsu" "vcs")
+(keywords "vc" "jj" "jujutsu" "vcs")
 
 (package-file "jj.el")
 
