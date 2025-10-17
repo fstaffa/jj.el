@@ -1,0 +1,1 @@
+- use `eask test buttercup` to run tests

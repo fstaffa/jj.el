@@ -1,0 +1,6 @@
+Working copy changes:
+A  src/new-feature.el
+A  tests/test-new-feature.el
+M  src/core.el
+M  README.md
+R  src/deprecated.el

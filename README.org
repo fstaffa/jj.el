@@ -1,6 +1,5 @@
 :PROPERTIES:
-:ID:       d78d185e-248a-40de-bfc8-d90312247c50
-:END:
+:ID:       d78d185e-248a-40de-bfc8-d90312247c50:END:
 #+title: jj.el
 
 [[https://magit.vc/][Magit]] like interface to [[https://jj-vcs.github.io/jj/latest/][Jujutsu]] version control system. Current goal is to use this project to learn more about both Emacs packages and Jujutsu.
@@ -8,3 +7,55 @@
 There are currently more feature complete implementations for Jujutsu:
 - [[https://github.com/bennyandresen/jujutsu.el][jujutsu.el]] - Magit like interface
 - [[https://codeberg.org/emacs-jj-vc/vc-jj.el][vc-jj.el]] - ~vc.el~ integration
+
+** Features
+
+*** Status Buffer
+
+The status buffer provides a Magit-inspired interface for viewing and managing your jj repository state. It displays three main sections: Working Copy Changes, Revisions, and Bookmarks, with an ASCII graph visualization of your revision stack.
+
+The status buffer implements a "last described revision" staging workflow: when you stage a file with ~s~, it automatically moves to the most recent revision that has a description (not "no description set"). This enables efficient organization of changes across your revision stack without manual target selection.
+
+**** Keybindings
+
+| Key   | Command             | Description                                   |
+|-------+---------------------+-----------------------------------------------|
+| ~n~   | Next item           | Move to next file or revision                 |
+| ~p~   | Previous item       | Move to previous file or revision             |
+| ~s~   | Stage file          | Stage file at point to last described revision|
+| ~g~   | Refresh             | Manually refresh the status buffer            |
+| ~RET~ | Show diff (planned) | Show diff for file or revision at point       |
+| ~q~   | Quit                | Close the status buffer window                |
+| ~?~   | Help popup          | Show transient menu with available actions    |
+
+**** Buffer Layout Example
+
+#+BEGIN_EXAMPLE
+jj: my-project
+
+Working Copy Changes
+  M  src/main.el
+  A  tests/test-new.el
+
+Revisions (immutable_heads()..@)
+  @  qpvuntsm  Working copy
+  │
+  ◉  yqosqzyt  Add new feature [main]
+  │
+  ◉  mzvwutvl  Fix bug in parser
+  │
+  ~  (immutable)
+
+Bookmarks
+  main  → yqosqzyt
+  dev   → mzvwutvl
+#+END_EXAMPLE
+
+**** Staging Workflow
+
+1. Make changes to multiple files in your working copy
+2. Open the status buffer with ~M-x jj-status~
+3. Navigate to a file with ~n~ or ~p~
+4. Press ~s~ to stage that file to the last revision with a description
+5. The buffer auto-refreshes, showing the updated state
+6. Repeat for other files to organize changes across your revision stack
