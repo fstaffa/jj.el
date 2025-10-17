@@ -16,7 +16,7 @@
 ;; ----------------
 ;;
 ;; All external command execution is mocked using `cl-letf` to override
-;; `shell-command-to-string`. This ensures:
+;; `call-process`. This ensures:
 ;;   - Tests run without jj binary installed
 ;;   - Tests are fast (no actual process execution)
 ;;   - Tests are reproducible (deterministic outputs)
@@ -35,13 +35,15 @@
 ;; Quick Start Examples
 ;; --------------------
 ;;
-;; Example 1: Test a function that runs a jj command
+;; Example 1: Test a function that runs a jj command with new return format
 ;;
 ;;   (describe "jj--bookmarks-get"
 ;;     (it "should parse bookmark list"
 ;;       (jj-test-with-mocked-command
-;;         '(("jj --no-pager --color never bookmark list -T 'name ++ \"\\n\"'"
-;;            . "main\ndev-branch\n"))
+;;         '(("jj" ("--no-pager" "--color" "never" "bookmark" "list" "-T" "name ++ \"\\n\"")
+;;            :exit-code 0
+;;            :stdout "main\\ndev-branch\\n"
+;;            :stderr ""))
 ;;         (jj-test-with-project-folder "/tmp/test"
 ;;           (expect (jj--bookmarks-get) :to-equal '("main" "dev-branch"))))))
 ;;
@@ -49,25 +51,28 @@
 ;;
 ;;   (describe "jj--bookmarks-get"
 ;;     (it "should parse bookmarks from fixture"
-;;       (let ((fixture (jj-test-load-fixture "sample-bookmarks.txt"))
-;;             (cmd "jj --no-pager --color never bookmark list -T 'name ++ \"\\n\"'"))
+;;       (let ((fixture (jj-test-load-fixture "sample-bookmarks.txt")))
 ;;         (jj-test-with-mocked-command
-;;           (list (cons cmd fixture))
+;;           '(("jj" ("--no-pager" "--color" "never" "bookmark" "list" "-T" "name ++ \"\\n\"")
+;;              :exit-code 0
+;;              :stdout fixture
+;;              :stderr ""))
 ;;           (jj-test-with-project-folder "/tmp/test"
 ;;             (expect (jj--bookmarks-get) :to-equal '("dev-branch" "feature-branch" "main")))))))
 ;;
-;; Example 3: Test command construction
+;; Example 3: Test command failure with stderr
 ;;
 ;;   (describe "jj--run-command"
-;;     (it "should construct correct command"
-;;       (let ((captured-command nil))
-;;         (cl-letf (((symbol-function 'shell-command-to-string)
-;;                    (lambda (cmd)
-;;                      (setq captured-command cmd)
-;;                      "output")))
-;;           (jj-test-with-project-folder "/tmp/test"
-;;             (jj--run-command "status")
-;;             (expect captured-command :to-equal "jj --no-pager --color never status"))))))
+;;     (it "should handle command failure"
+;;       (jj-test-with-mocked-command
+;;         '(("jj" ("--no-pager" "--color" "never" "invalid")
+;;            :exit-code 1
+;;            :stdout ""
+;;            :stderr "Error: unknown command"))
+;;         (jj-test-with-project-folder "/tmp/test"
+;;           (let ((result (jj--run-command "invalid")))
+;;             (expect (car result) :to-be nil)
+;;             (expect (cadddr result) :to-equal 1))))))
 ;;
 ;; Example 4: Test user interaction with completing-read
 ;;
@@ -106,11 +111,11 @@
 ;; -------------
 ;;
 ;; Run all tests:
-;;   eask run script test
+;;   eask test buttercup
 ;;
 ;; Expected output:
 ;;   - All tests should pass
-;;   - Execution time should be under 1 second
+;;   - Execution time should be under 2 seconds
 ;;   - No actual jj commands should be executed
 ;;
 ;; Available Fixtures
@@ -155,36 +160,63 @@
                      (or load-file-name buffer-file-name)))
   "Absolute path to test fixtures directory.")
 
-(defmacro jj-test-with-mocked-command (command-to-output &rest body)
-  "Execute BODY with mocked shell commands.
+(defmacro jj-test-with-mocked-command (command-specs &rest body)
+  "Execute BODY with mocked call-process for jj commands.
 
-COMMAND-TO-OUTPUT is an alist mapping command strings to their outputs.
-Each entry should be a cons cell: (COMMAND-STRING . OUTPUT-STRING)
+COMMAND-SPECS is a list of command specifications, where each spec has the form:
+  (PROGRAM ARGS-LIST :exit-code EXIT :stdout STDOUT :stderr STDERR)
 
-This macro mocks `shell-command-to-string' to return predefined outputs
-instead of executing actual shell commands. Uses exact string matching.
+PROGRAM is the program name (e.g., \"jj\")
+ARGS-LIST is a list of argument strings
+EXIT is the exit code (integer)
+STDOUT is the stdout output string
+STDERR is the stderr output string
+
+This macro mocks `call-process' to return predefined outputs based on
+command matching. Commands are matched by program name and args list.
 
 Example:
   (jj-test-with-mocked-command
-    \\='((\"jj --no-pager --color never status\" . \"Working copy changes:\"))
-    (expect (jj--run-command \"status\") :to-equal \"Working copy changes:\"))
+    '((\"jj\" (\"--no-pager\" \"--color\" \"never\" \"status\")
+       :exit-code 0
+       :stdout \"Working copy changes:\\n\"
+       :stderr \"\"))
+    (expect (jj--run-command \"status\") :to-equal '(t \"Working copy changes:\\n\" \"\" 0)))
 
 The macro will signal an error if an unexpected command is executed,
 helping catch issues where commands don't match expected format.
 
 Usage Notes:
-  - Command strings must match exactly (use string-equal)
-  - Multiple commands can be mocked by providing multiple alist entries
+  - Command matching uses equal for program and args comparison
+  - Multiple commands can be mocked by providing multiple specs
   - Combine with `jj-test-with-project-folder' to fully isolate tests
-  - Unexpected commands will signal an error with the command string"
+  - Unexpected commands will signal an error with the command details"
   (declare (indent 1))
-  `(cl-letf (((symbol-function 'shell-command-to-string)
-              (lambda (command)
-                (let ((result (cl-assoc command ,command-to-output :test #'string-equal)))
-                  (if result
-                      (cdr result)
-                    (error "Unexpected command: %s" command))))))
-     ,@body))
+  (let ((specs-sym (make-symbol "specs")))
+    `(let ((,specs-sym ,command-specs))
+       (cl-letf (((symbol-function 'call-process)
+                  (lambda (program infile destination _display &rest args)
+                    (let ((spec (cl-find-if
+                                 (lambda (s)
+                                   (and (equal program (car s))
+                                        (equal args (cadr s))))
+                                 ,specs-sym)))
+                      (if spec
+                          (let ((exit-code (plist-get (cddr spec) :exit-code))
+                                (stdout (plist-get (cddr spec) :stdout))
+                                (stderr (plist-get (cddr spec) :stderr)))
+                            (when destination
+                              (let ((stdout-buf (if (listp destination) (car destination) destination))
+                                    (stderr-buf (when (listp destination) (cadr destination))))
+                                (when stdout-buf
+                                  (with-current-buffer stdout-buf
+                                    (insert stdout)))
+                                (when stderr-buf
+                                  (with-current-buffer stderr-buf
+                                    (insert stderr)))))
+                            exit-code)
+                        (error "Unexpected command: %s %s" program (string-join args " ")))))))
+         ,@body))))
 
 (defmacro jj-test-with-user-input (mock-config &rest body)
   "Execute BODY with mocked user interaction functions.
