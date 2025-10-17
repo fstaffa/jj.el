@@ -144,7 +144,7 @@ STDERR is the stderr output from the command.
 STDOUT is the stdout output from the command.
 
 Error categorization:
-- User errors (exit codes 1-2 or 'invalid' in stderr): signals `user-error'
+- User errors (exit codes 1-2 or \"invalid\" in stderr): signals `user-error'
 - Command failures (exit codes 1-255): signals `error'
 - System errors (binary not found): signals `error'"
   ;; Log error handling
