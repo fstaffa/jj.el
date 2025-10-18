@@ -27,7 +27,6 @@
         (let ((file-data '(:path "test.txt" :status "M")))
           (insert "M  test.txt\n")
           (put-text-property 1 (1- (point-max)) 'jj-item file-data)
-          (jj-status-mode)
           (goto-char 1)
           (let ((result (jj-status--item-at-point)))
             (expect (plist-get result :type) :to-be 'file)
@@ -38,7 +37,6 @@
         (let ((rev-data '(:change-id "qpvuntsm" :description "Test")))
           (insert "@  qpvuntsm  Test\n")
           (put-text-property 1 (1- (point-max)) 'jj-item rev-data)
-          (jj-status-mode)
           (goto-char 1)
           (let ((result (jj-status--item-at-point)))
             (expect (plist-get result :type) :to-be 'revision)
@@ -96,7 +94,6 @@
       (with-temp-buffer
         (insert "M  test.txt\n")
         (put-text-property 1 (1- (point-max)) 'jj-item '(:path "test.txt" :status "M"))
-        (jj-status-mode)
         (goto-char 1)
         ;; Function shows message, doesn't throw error
         (jj-status-show-diff)
@@ -106,7 +103,6 @@
       (with-temp-buffer
         (insert "@  qpvuntsm  Working copy\n")
         (put-text-property 1 (1- (point-max)) 'jj-item '(:change-id "qpvuntsm"))
-        (jj-status-mode)
         (goto-char 1)
         ;; Function shows message, doesn't throw error
         (jj-status-show-diff)
