@@ -25,9 +25,9 @@
 (require 'jj)
 
 ;; Helper function to build expected args
-(defun jj-test--build-args (command-string)
-  "Build args list from COMMAND-STRING the same way jj--run-command does."
-  (append '("--no-pager" "--color" "never") (split-string command-string)))
+(defun jj-test--build-args (command-list)
+  "Build args list from COMMAND-LIST the same way jj--run-command does."
+  (append '("--no-pager" "--color" "never") (flatten-tree command-list)))
 
 ;; Test Suite: jj-status--save-cursor-context
 ;; -------------------------------------------
@@ -96,9 +96,9 @@
   (it "should re-fetch data and re-render buffer"
     (let ((refresh-count 0)
           (buffer nil)
-          (log-cmd "log --revisions \"immutable_heads()..@\" --graph -T 'change_id ++ \"\\n\" ++ description ++ \"\\n\" ++ bookmarks ++ \"\\n\"'")
-          (status-cmd "status")
-          (bookmark-cmd "bookmark list -T 'name ++ \"\\t\" ++ change_id ++ \"\\n\"'"))
+          (log-cmd '("log" "--revisions" "immutable_heads()..@" "--graph" "-T" "change_id ++ \"\\n\" ++ description ++ \"\\n\" ++ bookmarks ++ \"\\n\""))
+          (status-cmd '("status"))
+          (bookmark-cmd '("bookmark" "list" "-T" "name ++ \"\\t\" ++ change_id ++ \"\\n\"")))
       (jj-test-with-mocked-command
         (list (list "jj" (jj-test--build-args log-cmd)
                     :exit-code 0
@@ -124,9 +124,9 @@
 
   (it "should preserve cursor position when item still exists"
     (let ((buffer nil)
-          (log-cmd "log --revisions \"immutable_heads()..@\" --graph -T 'change_id ++ \"\\n\" ++ description ++ \"\\n\" ++ bookmarks ++ \"\\n\"'")
-          (status-cmd "status")
-          (bookmark-cmd "bookmark list -T 'name ++ \"\\t\" ++ change_id ++ \"\\n\"'"))
+          (log-cmd '("log" "--revisions" "immutable_heads()..@" "--graph" "-T" "change_id ++ \"\\n\" ++ description ++ \"\\n\" ++ bookmarks ++ \"\\n\""))
+          (status-cmd '("status"))
+          (bookmark-cmd '("bookmark" "list" "-T" "name ++ \"\\t\" ++ change_id ++ \"\\n\"")))
       (jj-test-with-mocked-command
         (list (list "jj" (jj-test--build-args log-cmd)
                     :exit-code 0
@@ -175,9 +175,9 @@
 (describe "jj-status entry point"
   (it "should use new rendering pipeline with fetch-parse-render workflow"
     (let ((buffer nil)
-          (log-cmd "log --revisions \"immutable_heads()..@\" --graph -T 'change_id ++ \"\\n\" ++ description ++ \"\\n\" ++ bookmarks ++ \"\\n\"'")
-          (status-cmd "status")
-          (bookmark-cmd "bookmark list -T 'name ++ \"\\t\" ++ change_id ++ \"\\n\"'"))
+          (log-cmd '("log" "--revisions" "immutable_heads()..@" "--graph" "-T" "change_id ++ \"\\n\" ++ description ++ \"\\n\" ++ bookmarks ++ \"\\n\""))
+          (status-cmd '("status"))
+          (bookmark-cmd '("bookmark" "list" "-T" "name ++ \"\\t\" ++ change_id ++ \"\\n\"")))
       (jj-test-with-mocked-command
         (list (list "jj" (jj-test--build-args log-cmd)
                     :exit-code 0
