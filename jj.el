@@ -263,11 +263,13 @@ Example:
       (dolist (line lines)
         ;; Match lines with change IDs (contain alphanumeric after graph symbols)
         ;; Format: GRAPH  CHANGEID | DESCRIPTION | BOOKMARKS
-        (when (string-match "\\`\\([^a-z]*\\)\\([a-z0-9]+\\) | \\([^|]*\\) | \\(.*\\)\\'" line)
+        (when (string-match "\\`\\([^a-z]*\\)\\([a-z0-9]+\\) |\\([^|]*\\)|\\(.*\\)\\'" line)
           (let* ((graph (match-string 1 line))
                  (change-id (match-string 2 line))
-                 (description (string-trim (match-string 3 line)))
-                 (bookmarks-str (string-trim (match-string 4 line)))
+                 (description-raw (match-string 3 line))
+                 (bookmarks-raw (match-string 4 line))
+                 (description (if description-raw (string-trim description-raw) ""))
+                 (bookmarks-str (if bookmarks-raw (string-trim bookmarks-raw) ""))
                  (bookmarks (if (string-empty-p bookmarks-str)
                                 nil
                               (split-string bookmarks-str " " t))))
@@ -625,24 +627,28 @@ Currently displays a placeholder message."
 ;; Task Group 5: File Staging System
 
 (defun jj-status--find-last-described-revision (revisions)
-  "Find most recent revision where description is not \"no description set\".
+  "Find most recent revision where description is not empty.
 
 INPUT: List of revision plists from jj-status--parse-log-output
 
 RETURNS: Revision plist or nil if no described revision found.
 
-Iterates from top of list (most recent) and returns the first revision
-with description ≠ \"no description set\".
+Iterates from top of list (most recent), skips the working copy revision
+(marked with @ in graph-line), and returns the first revision with a
+non-empty description.
 
 Example:
   (jj-status--find-last-described-revision
-    '((:change-id \"abc\" :description \"no description set\")
-      (:change-id \"def\" :description \"Add feature\")))
-  => (:change-id \"def\" :description \"Add feature\")"
+    '((:graph-line \"@  \" :change-id \"abc\" :description \"\")
+      (:graph-line \"○  \" :change-id \"def\" :description \"Add feature\")))
+  => (:graph-line \"○  \" :change-id \"def\" :description \"Add feature\")"
   (when revisions
     (cl-loop for revision in revisions
+             for graph = (plist-get revision :graph-line)
              for description = (plist-get revision :description)
-             when (not (string= description "(no description set)"))
+             ;; Skip working copy (@) and revisions with empty descriptions
+             when (and (not (string-match-p "@" graph))
+                       (not (string-empty-p description)))
              return revision)))
 
 (defun jj-status--validate-staging-target (change-id)
@@ -777,7 +783,7 @@ Error messages:
 (transient-define-prefix jj-status-describe-popup ()
   "Popup for jujutsu describe comand."
   ["Options"
-   ("-m" "Message" "-m=" :reader (lambda (&rest _args) (s-concat "\"" (read-string "-m ") "\"")))]
+   ("-m" "Message" "-m " :reader (lambda (&rest _args) (shell-quote-argument (read-string "Message: "))))]
   ["Actions"
    ("d" "Describe" jj-status-describe)])
 
@@ -847,7 +853,7 @@ Error messages:
   :value '("-n=256")
   ["Options"
    ("-r" "Revisions" "--revisions=" :reader jj--revset-read)
-   ("-n" "Number of revisions to show" "-n=" :reader (lambda (&rest _args) (s-concat "\"" (read-string "-n ") "\"")))
+   ("-n" "Number of revisions to show" "-n=" :reader (lambda (&rest _args) (read-string "-n ")))
    ("-s" "Summary, for each path show only whethr it was added, modified or deleted" "--summary" )
    ("-p" "Show patch" "--patch" )
    ("-R" "Show revisions in the opposite order (older first)" "--reversed" )
@@ -903,7 +909,7 @@ Error messages:
    ]
 
   ["Options"
-   ("-m" "Message" "-m=" :reader (lambda (&rest _args) (s-concat "\"" (read-string "-m ") "\"")))
+   ("-m" "Message" "-m " :reader (lambda (&rest _args) (shell-quote-argument (read-string "Message: "))))
    ("-E" "Do not edit the newly created change" "--no-edit")
    ("-b" "Insert the new change before the given commit" "--insert-before" :reader jj--revset-read)
    ("-a" "Insert the new change after the given commit" "--insert-after" :reader jj--revset-read)
@@ -925,8 +931,8 @@ Error messages:
   "Popup for jujutsu git fetch command"
   :value '("--branch=glob:*")
   ["Options"
-   ("-b" "Fetch only some branches" "--branch" :reader (lambda (&rest _args) (s-concat  "\"" (read-string "--branch ") "\"")))
-   ("-r" "The remote to fetch from" "--remote" (lambda (&rest _args) (s-concat  "\"" (read-string "--branch ") "\""))) ;;can be repeated
+   ("-b" "Fetch only some branches" "--branch" :reader (lambda (&rest _args) (read-string "--branch ")))
+   ("-r" "The remote to fetch from" "--remote" :reader (lambda (&rest _args) (read-string "--remote "))) ;;can be repeated
    ("-a" "Fetch from all remotes" "--all-remotes")
    ]
   ["Actions"
@@ -942,9 +948,9 @@ Error messages:
 (transient-define-prefix jj-push-popup ()
   "Popup for jujutsu git push command"
   ["Options"
-   ("-b" "Push only this bookmark or bookmarks matchin a pattern" "--bookmark=" :reader (lambda (&rest _args) (s-concat  "\"" (read-string "--branch ") "\""))) ;;can be repeated
-   ("-c" "Push this commit by creating a bookmark based on its change ID" "--change=" :reader (lambda (&rest _args) (s-concat  "\"" (read-string "--change ") "\""))) ;;can be repeated
-   ("-r" "The remote to push to" "--remote=" (lambda (&rest _args) (s-concat  "\"" (read-string "--branch ") "\"")))
+   ("-b" "Push only this bookmark or bookmarks matchin a pattern" "--bookmark=" :reader (lambda (&rest _args) (read-string "--bookmark "))) ;;can be repeated
+   ("-c" "Push this commit by creating a bookmark based on its change ID" "--change=" :reader (lambda (&rest _args) (read-string "--change "))) ;;can be repeated
+   ("-r" "The remote to push to" "--remote=" :reader (lambda (&rest _args) (read-string "--remote ")))
    ("-a" "Push all bookmark (including new and deleted)" "--all")
    ("-t" "Push all tracked bookmarks" "--tracked")
    ("-N" "Push all new bookmarks" "--allow-new")
@@ -984,3 +990,7 @@ Use n/p to navigate between items, s to stage files, g to refresh."
 (define-key jj-status-mode-map (kbd "g") #'jj-status-refresh)
 
 ;;; jj.el ends here
+
+;; Local Variables:
+;; no-byte-compile: t
+;; End:

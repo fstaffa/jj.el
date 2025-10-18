@@ -37,7 +37,7 @@
 (describe "Auto-refresh integration: jj-status-describe"
   (it "should call jj-status after successful describe command"
     (let ((buffer-created nil)
-          (describe-cmd "describe -m=\"Test message\"")
+          (describe-cmd "describe -m 'Test message'")
           (status-cmd "status"))
       (jj-test-with-mocked-command
         (list (list "jj" (jj-test--build-args describe-cmd)
@@ -51,7 +51,7 @@
         (cl-letf (((symbol-function 'switch-to-buffer)
                    (lambda (_buf) (setq buffer-created t) nil)))
           (jj-test-with-project-folder "/tmp/test/"
-            (jj-status-describe '("-m=\"Test message\""))
+            (jj-status-describe '("-m 'Test message'"))
             ;; Verify that jj-status was called (buffer created)
             (expect buffer-created :to-be t)))))))
 
@@ -87,7 +87,7 @@
 (describe "Auto-refresh integration: jj--new"
   (it "should call jj-status after successful new command"
     (let ((buffer-created nil)
-          (new-cmd "new -m=\"New change\"")
+          (new-cmd "new -m 'New change'")
           (status-cmd "status"))
       (jj-test-with-mocked-command
         (list (list "jj" (jj-test--build-args new-cmd)
@@ -103,7 +103,7 @@
                   ((symbol-function 'transient-scope)
                    (lambda () nil)))
           (jj-test-with-project-folder "/tmp/test/"
-            (jj--new '("-m=\"New change\""))
+            (jj--new '("-m 'New change'"))
             ;; Verify that jj-status was called (buffer created)
             (expect buffer-created :to-be t)))))))
 
