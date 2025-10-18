@@ -26,10 +26,10 @@
       (with-temp-buffer
         (jj-status-mode)
         (let ((file-data '(:path "test.txt" :status "M"))
-              (inhibit-read-only t))
-          (insert "M  test.txt\n")
-          (put-text-property 1 (1- (point-max)) 'jj-item file-data)
-          (goto-char 1)
+              (inhibit-read-only t)
+              (start (point)))
+          (insert (propertize "M  test.txt\n" 'jj-item file-data))
+          (goto-char start)
           (let ((result (jj-status--item-at-point)))
             (expect (plist-get result :type) :to-be 'file)
             (expect (plist-get result :data) :to-equal file-data)))))
@@ -38,10 +38,10 @@
       (with-temp-buffer
         (jj-status-mode)
         (let ((rev-data '(:change-id "qpvuntsm" :description "Test"))
-              (inhibit-read-only t))
-          (insert "@  qpvuntsm  Test\n")
-          (put-text-property 1 (1- (point-max)) 'jj-item rev-data)
-          (goto-char 1)
+              (inhibit-read-only t)
+              (start (point)))
+          (insert (propertize "@  qpvuntsm  Test\n" 'jj-item rev-data))
+          (goto-char start)
           (let ((result (jj-status--item-at-point)))
             (expect (plist-get result :type) :to-be 'revision)
             (expect (plist-get result :data) :to-equal rev-data)))))
@@ -97,10 +97,10 @@
     (it "should show placeholder message for files"
       (with-temp-buffer
         (jj-status-mode)
-        (let ((inhibit-read-only t))
-          (insert "M  test.txt\n")
-          (put-text-property 1 (1- (point-max)) 'jj-item '(:path "test.txt" :status "M"))
-          (goto-char 1)
+        (let ((inhibit-read-only t)
+              (start (point)))
+          (insert (propertize "M  test.txt\n" 'jj-item '(:path "test.txt" :status "M")))
+          (goto-char start)
           ;; Function shows message, doesn't throw error
           (jj-status-show-diff)
           (expect t :to-be t))))
@@ -108,10 +108,10 @@
     (it "should show placeholder message for revisions"
       (with-temp-buffer
         (jj-status-mode)
-        (let ((inhibit-read-only t))
-          (insert "@  qpvuntsm  Working copy\n")
-          (put-text-property 1 (1- (point-max)) 'jj-item '(:change-id "qpvuntsm"))
-          (goto-char 1)
+        (let ((inhibit-read-only t)
+              (start (point)))
+          (insert (propertize "@  qpvuntsm  Working copy\n" 'jj-item '(:change-id "qpvuntsm")))
+          (goto-char start)
           ;; Function shows message, doesn't throw error
           (jj-status-show-diff)
           (expect t :to-be t))))))
