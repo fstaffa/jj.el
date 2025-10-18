@@ -1,0 +1,40 @@
+task_assignments:
+  # Note: This is an Emacs Lisp package, not a web application with database/API/frontend layers.
+  # The standard implementers (database-engineer, api-engineer, ui-designer) don't directly map.
+  # Using generic approach for Emacs Lisp implementation tasks, with testing-engineer for test-focused work.
+
+  - task_group: "Task Group 1: Command Execution Infrastructure"
+    assigned_subagent: "api-engineer"
+    rationale: "API engineer handles external command execution and data fetching, similar to calling jj CLI commands"
+
+  - task_group: "Task Group 2: Output Parsing & Data Structures"
+    assigned_subagent: "api-engineer"
+    rationale: "API engineer handles data parsing and structure transformation, similar to parsing jj command outputs"
+
+  - task_group: "Task Group 3: Buffer Rendering System"
+    assigned_subagent: "ui-designer"
+    rationale: "UI designer handles visual rendering, styling, and formatting, similar to rendering Emacs buffer content"
+
+  - task_group: "Task Group 4: Navigation System"
+    assigned_subagent: "ui-designer"
+    rationale: "UI designer handles user interactions and navigation, similar to cursor movement in buffers"
+
+  - task_group: "Task Group 5: File Staging System"
+    assigned_subagent: "api-engineer"
+    rationale: "API engineer handles business logic and command execution, similar to staging files with jj squash"
+
+  - task_group: "Task Group 6: Buffer Refresh System"
+    assigned_subagent: "ui-designer"
+    rationale: "UI designer handles view refresh and state management, similar to buffer re-rendering"
+
+  - task_group: "Task Group 7: Auto-refresh Integration"
+    assigned_subagent: "api-engineer"
+    rationale: "API engineer handles integration logic and hooks, similar to adding advice to existing commands"
+
+  - task_group: "Task Group 8: Test Review & Gap Analysis"
+    assigned_subagent: "testing-engineer"
+    rationale: "Testing engineer specializes in test coverage analysis and writing comprehensive tests"
+
+  - task_group: "Task Group 9: Documentation & Help Integration"
+    assigned_subagent: "ui-designer"
+    rationale: "UI designer handles user-facing documentation and help systems"

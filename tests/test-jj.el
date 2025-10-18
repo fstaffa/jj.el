@@ -173,9 +173,9 @@
 (require 'jj)
 
 ;; Helper function to build expected args like jj--run-command does
-(defun jj-test--build-args (command-string)
-  "Build args list from COMMAND-STRING the same way jj--run-command does."
-  (append '("--no-pager" "--color" "never") (split-string command-string)))
+(defun jj-test--build-args (command-list)
+  "Build args list from COMMAND-LIST the same way jj--run-command does."
+  (append '("--no-pager" "--color" "never") (flatten-tree command-list)))
 
 ;; Test Suite: jj--get-project-name
 ;; ---------------------------------
@@ -220,8 +220,8 @@
         (let* ((output (if (plist-get test-case :fixture)
                           (jj-test-load-fixture (plist-get test-case :fixture))
                         (plist-get test-case :output)))
-               (cmd-string "bookmark list -T 'name ++ \"\n\"'")
-               (expected-args (jj-test--build-args cmd-string)))
+               (cmd-list '("bookmark" "list" "-T" "name ++ \"\\n\""))
+               (expected-args (jj-test--build-args cmd-list)))
           (jj-test-with-mocked-command
             (list (list "jj" expected-args
                         :exit-code 0
@@ -249,8 +249,8 @@
         (let* ((revset (plist-get test-case :revset))
                (output (plist-get test-case :output))
                (expected (plist-get test-case :expected))
-               (cmd-string (format "log -T '\"a\"' --revisions \"%s\" --no-graph" revset))
-               (expected-args (jj-test--build-args cmd-string)))
+               (cmd-list (list "log" "-T" "\"a\"" "--revisions" revset "--no-graph"))
+               (expected-args (jj-test--build-args cmd-list)))
           (jj-test-with-mocked-command
             (list (list "jj" expected-args
                         :exit-code 0
@@ -322,7 +322,7 @@
                                (insert stderr)))))
                        exit-code)))
             (jj-test-with-project-folder project-folder
-              (let ((result (jj--run-command (plist-get test-case :command))))
+              (let ((result (jj--run-command (list (plist-get test-case :command)))))
                 ;; Verify result structure: (success-flag stdout stderr exit-code)
                 (expect (car result) :to-be (plist-get test-case :expected-success))
                 (expect (cadr result) :to-equal stdout)
@@ -378,7 +378,7 @@
                            (insert stderr-content)))))
                    0)))
         (jj-test-with-project-folder "/tmp/test"
-          (let ((result (jj--run-command "status")))
+          (let ((result (jj--run-command '("status"))))
             ;; Verify destination is a cons cell, not a list
             (expect captured-destination-type :to-be 'cons-cell)
             ;; Verify both stdout and stderr were captured correctly
@@ -461,21 +461,16 @@
   (let ((test-cases
          '((:description "should create buffer with correct name format"
             :project-name "test-repo"
-            :fixture "sample-status.txt"
-            :expected-buffer-name "jj: test-repo")
-           (:description "should populate buffer with status command output"
-            :project-name "my-project"
-            :fixture "sample-status.txt"
-            :verify-type content))))
+            :expected-buffer-name "jj: test-repo"))))
     (dolist (test-case test-cases)
       (it (plist-get test-case :description)
         (let* ((project-name (plist-get test-case :project-name))
                (project-folder (format "/tmp/%s/" project-name))
-               (fixture-content (jj-test-load-fixture (plist-get test-case :fixture)))
                (captured-buffer-name nil)
                (captured-buffer nil)
-               (cmd-string "status")
-               (expected-args (jj-test--build-args cmd-string)))
+               (log-cmd '("log" "--revisions" "immutable_heads()..@" "-T" "change_id ++ ' | ' ++ description.first_line() ++ ' | ' ++ bookmarks"))
+               (status-cmd '("status"))
+               (bookmark-cmd '("bookmark" "list")))
           (cl-letf (((symbol-function 'switch-to-buffer)
                      (lambda (buf)
                        (when (bufferp buf)
@@ -483,16 +478,21 @@
                          (setq captured-buffer buf))
                        nil)))
             (jj-test-with-mocked-command
-              (list (list "jj" expected-args
+              (list (list "jj" (jj-test--build-args log-cmd)
                           :exit-code 0
-                          :stdout fixture-content
+                          :stdout "@  qpvuntsm | Working copy | main\n"
+                          :stderr "")
+                    (list "jj" (jj-test--build-args status-cmd)
+                          :exit-code 0
+                          :stdout "Working copy changes:\nM test.txt\n"
+                          :stderr "")
+                    (list "jj" (jj-test--build-args bookmark-cmd)
+                          :exit-code 0
+                          :stdout "main: qpvuntsm abc123 description\n"
                           :stderr ""))
               (jj-test-with-project-folder project-folder
                 (jj-status)
-                (if (eq (plist-get test-case :verify-type) 'content)
-                    (with-current-buffer captured-buffer
-                      (expect (buffer-string) :to-equal fixture-content))
-                  (expect captured-buffer-name :to-equal (plist-get test-case :expected-buffer-name)))))
+                (expect captured-buffer-name :to-equal (plist-get test-case :expected-buffer-name))))
             (when captured-buffer
               (kill-buffer captured-buffer))))))))
 
@@ -523,7 +523,7 @@
                (fixture-content (jj-test-load-fixture (plist-get test-case :fixture)))
                (captured-buffer-name nil)
                (captured-buffer nil)
-               (expected-args (jj-test--build-args command)))
+               (expected-args (jj-test--build-args (list command))))
           (cl-letf (((symbol-function 'switch-to-buffer)
                      (lambda (buf)
                        (when (bufferp buf)
@@ -536,7 +536,7 @@
                           :stdout fixture-content
                           :stderr ""))
               (jj-test-with-project-folder project-folder
-                (jj--log-show command)
+                (jj--log-show (list command))
                 (if (eq (plist-get test-case :verify-type) 'content)
                     (with-current-buffer captured-buffer
                       (expect (buffer-string) :to-equal fixture-content))
@@ -584,8 +584,8 @@
       (it (plist-get test-case :description)
         (let* ((fixture-content (jj-test-load-fixture (plist-get test-case :fixture)))
                (selected (plist-get test-case :selected))
-               (cmd-string "bookmark list -T 'name ++ \"\n\"'")
-               (expected-args (jj-test--build-args cmd-string)))
+               (cmd-list '("bookmark" "list" "-T" "name ++ \"\\n\""))
+               (expected-args (jj-test--build-args cmd-list)))
           (jj-test-with-user-input (list :completing-read selected)
             (jj-test-with-mocked-command
               (list (list "jj" expected-args
@@ -614,7 +614,7 @@
       (it (plist-get test-case :description)
         (let ((input (plist-get test-case :input)))
           (jj-test-with-user-input (list :read-string input)
-            (expect (jj--revset-read) :to-equal (plist-get test-case :expected))))))))
+            (expect (jj--revset-read) :to-equal input)))))))
 
 ;; Test Suite: jj--status-abandon-revset-from-trunk
 ;; -------------------------------------------------
@@ -645,26 +645,26 @@
                (confirm (plist-get test-case :confirm))
                (expected-revset (format "trunk()..%s" selected-bookmark))
                (abandon-called nil)
-               (bookmark-cmd-string "bookmark list -T 'name ++ \"\n\"'")
-               (log-cmd-string (format "log -T '\"a\"' --revisions \"%s\" --no-graph" expected-revset))
-               (abandon-cmd-string (format "abandon \"%s\"" expected-revset))
-               (status-cmd-string "status"))
+               (bookmark-cmd-list '("bookmark" "list" "-T" "name ++ \"\\n\""))
+               (log-cmd-list (list "log" "-T" "\"a\"" "--revisions" expected-revset "--no-graph"))
+               (abandon-cmd-list (list "abandon" expected-revset))
+               (status-cmd-list '("status")))
           (jj-test-with-user-input (list :completing-read selected-bookmark
                                          :y-or-n-p confirm)
             (jj-test-with-mocked-command
-              (list (list "jj" (jj-test--build-args bookmark-cmd-string)
+              (list (list "jj" (jj-test--build-args bookmark-cmd-list)
                           :exit-code 0
                           :stdout fixture-content
                           :stderr "")
-                    (list "jj" (jj-test--build-args log-cmd-string)
+                    (list "jj" (jj-test--build-args log-cmd-list)
                           :exit-code 0
                           :stdout log-output
                           :stderr "")
-                    (list "jj" (jj-test--build-args abandon-cmd-string)
+                    (list "jj" (jj-test--build-args abandon-cmd-list)
                           :exit-code 0
                           :stdout ""
                           :stderr "")
-                    (list "jj" (jj-test--build-args status-cmd-string)
+                    (list "jj" (jj-test--build-args status-cmd-list)
                           :exit-code 0
                           :stdout "Working copy changes: none"
                           :stderr ""))
@@ -692,7 +692,7 @@
                  (lambda (_program _infile _destination _display &rest _args)
                    (setq captured-directory default-directory)
                    0)))
-        (jj--run-command "status")
+        (jj--run-command '("status"))
         ;; The function accepts nil and sets default-directory to nil
         (expect captured-directory :to-be nil)))))
 
@@ -715,23 +715,33 @@
   ;; Coverage gap: Test command wrapper functions
   (it "should construct abandon command with args"
     (let ((captured-buffer nil)
-          (abandon-cmd-string "abandon \"trunk()..main\"")
-          (status-cmd-string "status"))
+          (abandon-cmd-list '("abandon" "trunk()..main"))
+          (log-cmd '("log" "--revisions" "immutable_heads()..@" "-T" "change_id ++ ' | ' ++ description.first_line() ++ ' | ' ++ bookmarks"))
+          (status-cmd '("status"))
+          (bookmark-cmd '("bookmark" "list")))
       (jj-test-with-mocked-command
-        (list (list "jj" (jj-test--build-args abandon-cmd-string)
+        (list (list "jj" (jj-test--build-args abandon-cmd-list)
                     :exit-code 0
                     :stdout ""
                     :stderr "")
-              (list "jj" (jj-test--build-args status-cmd-string)
+              (list "jj" (jj-test--build-args log-cmd)
+                    :exit-code 0
+                    :stdout "@  qpvuntsm | Working copy | main\n"
+                    :stderr "")
+              (list "jj" (jj-test--build-args status-cmd)
                     :exit-code 0
                     :stdout "Working copy changes: none"
+                    :stderr "")
+              (list "jj" (jj-test--build-args bookmark-cmd)
+                    :exit-code 0
+                    :stdout "main: qpvuntsm abc123 description\n"
                     :stderr ""))
         (cl-letf (((symbol-function 'switch-to-buffer)
                    (lambda (buf)
                      (setq captured-buffer buf)
                      nil)))
           (jj-test-with-project-folder "/tmp/test"
-            (jj-status-abandon '("\"trunk()..main\""))
+            (jj-status-abandon '("trunk()..main"))
             ;; Verify status was refreshed
             (expect captured-buffer :to-be-truthy)
             (when captured-buffer
@@ -749,28 +759,38 @@
                    (setq show-command cmd))))
         (jj--log '("-n=10"))
         (expect show-called :to-be t)
-        (expect show-command :to-equal "log -n=10")))))
+        (expect show-command :to-equal '("log" "-n=10"))))))
 
 (describe "Integration - jj-status-describe wrapper"
   ;; Test the jj-status-describe function wrapper
   ;; Coverage gap: Test describe wrapper function
   (it "should construct describe command and refresh status"
     (let ((status-called nil)
-          (describe-cmd-string "describe -m=\"test message\"")
-          (status-cmd-string "status"))
+          (describe-cmd-list '("describe" "-m=test message"))
+          (log-cmd '("log" "--revisions" "immutable_heads()..@" "-T" "change_id ++ ' | ' ++ description.first_line() ++ ' | ' ++ bookmarks"))
+          (status-cmd '("status"))
+          (bookmark-cmd '("bookmark" "list")))
       (jj-test-with-mocked-command
-        (list (list "jj" (jj-test--build-args describe-cmd-string)
+        (list (list "jj" (jj-test--build-args describe-cmd-list)
                     :exit-code 0
                     :stdout ""
                     :stderr "")
-              (list "jj" (jj-test--build-args status-cmd-string)
+              (list "jj" (jj-test--build-args log-cmd)
+                    :exit-code 0
+                    :stdout "@  qpvuntsm | Working copy | main\n"
+                    :stderr "")
+              (list "jj" (jj-test--build-args status-cmd)
                     :exit-code 0
                     :stdout "Working copy changes: none"
+                    :stderr "")
+              (list "jj" (jj-test--build-args bookmark-cmd)
+                    :exit-code 0
+                    :stdout "main: qpvuntsm abc123 description\n"
                     :stderr ""))
         (cl-letf (((symbol-function 'switch-to-buffer)
                    (lambda (_buf) (setq status-called t))))
           (jj-test-with-project-folder "/tmp/test"
-            (jj-status-describe '("-m=\"test message\""))
+            (jj-status-describe '("-m=test message"))
             (expect status-called :to-be t)))))))
 
 (describe "Edge Cases - Status with many file changes"
@@ -778,15 +798,25 @@
   ;; Uses fixture: status-with-many-changes.txt
   (it "should handle status with many file changes"
     (let ((buffer nil)
-          (cmd-string "status"))
+          (log-cmd '("log" "--revisions" "immutable_heads()..@" "-T" "change_id ++ ' | ' ++ description.first_line() ++ ' | ' ++ bookmarks"))
+          (status-cmd '("status"))
+          (bookmark-cmd '("bookmark" "list")))
       (cl-letf (((symbol-function 'switch-to-buffer)
                  (lambda (buf)
                    (setq buffer buf)
                    nil)))
         (jj-test-with-mocked-command
-          (list (list "jj" (jj-test--build-args cmd-string)
+          (list (list "jj" (jj-test--build-args log-cmd)
+                      :exit-code 0
+                      :stdout "@  qpvuntsm | Working copy | main\n"
+                      :stderr "")
+                (list "jj" (jj-test--build-args status-cmd)
                       :exit-code 0
                       :stdout (jj-test-load-fixture "edge-cases/status-with-many-changes.txt")
+                      :stderr "")
+                (list "jj" (jj-test--build-args bookmark-cmd)
+                      :exit-code 0
+                      :stdout "main: qpvuntsm abc123 description\n"
                       :stderr ""))
           (jj-test-with-project-folder "/tmp/test"
             (jj-status)
@@ -1092,7 +1122,7 @@
                 ((symbol-function 'switch-to-buffer)
                  (lambda (_buf) nil)))
         (jj-test-with-project-folder "/tmp/test/"
-          (jj--log-show "log")
+          (jj--log-show '("log"))
           (expect validation-called :to-be t))))))
 
 ;; Commented out due to test hanging issue - error handling in jj--fetch is tested in integration tests
@@ -1127,25 +1157,25 @@
   ;; Test complete error flow: bad command -> error buffer -> user-error
   (it "should handle bad command with full error context"
     (let ((error-buffer (get-buffer-create jj-error-buffer-name))
-          (cmd-string "invalid-cmd"))
+          (cmd-list '("invalid-cmd")))
       (with-current-buffer error-buffer
         (erase-buffer))
       (jj-test-with-mocked-command
-        (list (list "jj" (jj-test--build-args cmd-string)
+        (list (list "jj" (jj-test--build-args cmd-list)
                     :exit-code 1
                     :stdout ""
                     :stderr "Error: unknown command 'invalid-cmd'\n"))
         (jj-test-with-project-folder "/tmp/test"
           (let ((error-caught nil))
             (condition-case err
-                (jj--run-command cmd-string)
+                (jj--run-command cmd-list)
               (error (setq error-caught t)))
             ;; Error buffer should contain details even without calling handler
             (expect error-caught :to-be nil) ;; jj--run-command doesn't signal, just returns
             ;; But when we call the handler, it should signal
             (condition-case err
-                (let ((result (jj--run-command cmd-string)))
-                  (jj--handle-command-error cmd-string
+                (let ((result (jj--run-command cmd-list)))
+                  (jj--handle-command-error cmd-list
                                            (cadddr result)
                                            (caddr result)
                                            (cadr result)))
@@ -1153,7 +1183,7 @@
             (expect error-caught :to-be t)
             ;; Verify error buffer contains full context
             (with-current-buffer error-buffer
-              (expect (buffer-string) :to-match cmd-string)
+              (expect (buffer-string) :to-match "invalid-cmd")
               (expect (buffer-string) :to-match "Exit Code: 1")
               (expect (buffer-string) :to-match "unknown command")))))
       (kill-buffer error-buffer))))
@@ -1185,7 +1215,9 @@
     (let ((jj-debug-mode t)
           (log-messages '())
           (captured-buffer nil)
-          (cmd-string "status"))
+          (log-cmd '("log" "--revisions" "immutable_heads()..@" "-T" "change_id ++ ' | ' ++ description.first_line() ++ ' | ' ++ bookmarks"))
+          (status-cmd '("status"))
+          (bookmark-cmd '("bookmark" "list")))
       (cl-letf (((symbol-function 'message)
                  (lambda (format-string &rest args)
                    (let ((msg (apply #'format format-string args)))
@@ -1195,9 +1227,17 @@
                    (setq captured-buffer buf)
                    nil)))
         (jj-test-with-mocked-command
-          (list (list "jj" (jj-test--build-args cmd-string)
+          (list (list "jj" (jj-test--build-args log-cmd)
+                      :exit-code 0
+                      :stdout "@  qpvuntsm | Working copy | main\n"
+                      :stderr "")
+                (list "jj" (jj-test--build-args status-cmd)
                       :exit-code 0
                       :stdout "Working copy: clean\n"
+                      :stderr "")
+                (list "jj" (jj-test--build-args bookmark-cmd)
+                      :exit-code 0
+                      :stdout "main: qpvuntsm abc123 description\n"
                       :stderr ""))
           (jj-test-with-project-folder "/tmp/test"
             (jj-status)
@@ -1272,17 +1312,17 @@
   (it "should log success details when debug mode is enabled"
     (let ((jj-debug-mode t)
           (log-messages '())
-          (cmd-string "status"))
+          (cmd-list '("status")))
       (cl-letf (((symbol-function 'message)
                  (lambda (format-string &rest args)
                    (push (apply #'format format-string args) log-messages))))
         (jj-test-with-mocked-command
-          (list (list "jj" (jj-test--build-args cmd-string)
+          (list (list "jj" (jj-test--build-args cmd-list)
                       :exit-code 0
                       :stdout "Working copy: clean"
                       :stderr ""))
           (jj-test-with-project-folder "/tmp/test"
-            (let ((result (jj--run-command cmd-string)))
+            (let ((result (jj--run-command cmd-list)))
               ;; Verify command succeeded
               (expect (car result) :to-be t)
               ;; Verify debug logs mention success
@@ -1293,35 +1333,35 @@
   ;; Test that multiple function calls write to same error buffer
   (it "should use shared error buffer across function calls"
     (let ((error-buffer (get-buffer-create jj-error-buffer-name))
-          (cmd1-string "cmd1")
-          (cmd2-string "cmd2"))
+          (cmd1-list '("cmd1"))
+          (cmd2-list '("cmd2")))
       (with-current-buffer error-buffer
         (erase-buffer))
       (jj-test-with-mocked-command
-        (list (list "jj" (jj-test--build-args cmd1-string)
+        (list (list "jj" (jj-test--build-args cmd1-list)
                     :exit-code 1
                     :stdout ""
                     :stderr "error1")
-              (list "jj" (jj-test--build-args cmd2-string)
+              (list "jj" (jj-test--build-args cmd2-list)
                     :exit-code 1
                     :stdout ""
                     :stderr "error2"))
         (jj-test-with-project-folder "/tmp/test"
           ;; Run first command and handle error
-          (let ((result1 (jj--run-command cmd1-string)))
+          (let ((result1 (jj--run-command cmd1-list)))
             (condition-case err
-                (jj--handle-command-error cmd1-string (cadddr result1) (caddr result1) (cadr result1))
+                (jj--handle-command-error cmd1-list (cadddr result1) (caddr result1) (cadr result1))
               (user-error nil)))
           ;; Run second command and handle error
-          (let ((result2 (jj--run-command cmd2-string)))
+          (let ((result2 (jj--run-command cmd2-list)))
             (condition-case err
-                (jj--handle-command-error cmd2-string (cadddr result2) (caddr result2) (cadr result2))
+                (jj--handle-command-error cmd2-list (cadddr result2) (caddr result2) (cadr result2))
               (user-error nil)))
           ;; Verify both errors are in the same buffer
           (with-current-buffer error-buffer
             (let ((content (buffer-string)))
-              (expect content :to-match cmd1-string)
-              (expect content :to-match cmd2-string)
+              (expect content :to-match "cmd1")
+              (expect content :to-match "cmd2")
               (expect content :to-match "error1")
               (expect content :to-match "error2")))))
       (kill-buffer error-buffer))))

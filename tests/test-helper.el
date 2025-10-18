@@ -383,5 +383,75 @@ Creating New Fixtures:
       (insert-file-contents fixture-path)
       (buffer-string))))
 
+(defmacro jj-test-with-status-buffer (mock-outputs &rest body)
+  "Execute BODY with a real jj-status buffer created using mocked jj commands.
+
+MOCK-OUTPUTS is a plist with keys:
+  :log-output       - Output from 'jj log' command (for revisions)
+  :status-output    - Output from 'jj status' command (for files)
+  :bookmark-output  - Output from 'jj bookmark list' command (for bookmarks)
+
+This macro:
+1. Mocks jj--run-command to return the specified outputs for each command
+2. Calls jj-status to create a real status buffer
+3. Switches to that buffer and executes BODY in its context
+4. Automatically cleans up the buffer after BODY completes
+
+The created buffer is a fully functional jj-status buffer with:
+- Proper text properties (jj-item) for navigation
+- Correct buffer-local mode (jj-status-mode)
+- Parsed data structures in buffer-local variables
+
+Example:
+  (jj-test-with-status-buffer
+    (:log-output \"@  qpvuntsm | Working copy | main\\n\"
+     :status-output \"Working copy changes:\\nM  file.txt\\n\"
+     :bookmark-output \"main: qpvuntsm abc123 desc\\n\")
+    ;; Test navigation in the real buffer
+    (goto-char (point-min))
+    (jj-status-next-item)
+    (expect (get-text-property (point) 'jj-item) :not :to-be nil))
+
+Usage Notes:
+  - The buffer is created with all standard jj-status initialization
+  - BODY executes in the context of the jj-status buffer
+  - All three outputs must be provided (use empty strings if needed)
+  - The buffer is automatically cleaned up after BODY completes
+  - Combine with jj-test-with-project-folder for complete isolation"
+  (declare (indent 1))
+  (let ((log-output (plist-get mock-outputs :log-output))
+        (status-output (plist-get mock-outputs :status-output))
+        (bookmark-output (plist-get mock-outputs :bookmark-output))
+        (buffer-sym (make-symbol "buffer")))
+    `(let ((,buffer-sym nil))
+       (unwind-protect
+           (progn
+             (cl-letf (((symbol-function 'jj--run-command)
+                        (lambda (args)
+                          ;; Match command based on first argument after global args
+                          ;; args is always a list like '("log" ...) or '("status") or '("bookmark" "list")
+                          (let ((cmd (car args)))
+                            (cond
+                             ;; Match "log" command
+                             ((equal cmd "log")
+                              (list t ,log-output "" 0))
+                             ;; Match "status" command
+                             ((equal cmd "status")
+                              (list t ,status-output "" 0))
+                             ;; Match "bookmark" command
+                             ((equal cmd "bookmark")
+                              (list t ,bookmark-output "" 0))
+                             (t
+                              (error "Unexpected jj command in test: %s" args)))))))
+               (jj-test-with-project-folder "/tmp/test-project/"
+                 ;; Call jj-status which will create the buffer
+                 (jj-status)
+                 (setq ,buffer-sym (current-buffer))
+                 ;; Execute test body in the created buffer
+                 ,@body)))
+         ;; Cleanup: kill the buffer if it was created
+         (when (and ,buffer-sym (buffer-live-p ,buffer-sym))
+           (kill-buffer ,buffer-sym))))))
+
 (provide 'test-helper)
 ;;; test-helper.el ends here
