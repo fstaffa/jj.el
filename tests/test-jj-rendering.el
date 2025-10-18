@@ -5,7 +5,7 @@
 ;; Unit Tests for jj.el Buffer Rendering Functions
 ;; ===============================================
 ;;
-;; This file contains focused tests for Task Group 3: Buffer Rendering System.
+;; This file contains focused tests for Buffer Rendering System.
 ;; Tests verify section rendering, face application, and formatting logic.
 ;;
 ;; Test Coverage:

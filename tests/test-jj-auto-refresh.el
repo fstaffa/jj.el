@@ -2,7 +2,7 @@
 
 ;;; Commentary:
 
-;; Tests for Task Group 7: Auto-refresh Integration
+;; Tests for Auto-refresh Integration
 ;; ================================================
 ;;
 ;; This file tests the auto-refresh functionality that triggers status

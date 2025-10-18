@@ -6,7 +6,7 @@
 ;; ==========================================================
 ;;
 ;; This file contains strategic integration tests to fill critical coverage gaps
-;; identified in Task Group 8: Test Review & Gap Analysis.
+;; identified in Test Review & Gap Analysis.
 ;;
 ;; Test Coverage:
 ;;   - End-to-end workflow integration tests

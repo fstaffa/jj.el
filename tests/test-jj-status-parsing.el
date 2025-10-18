@@ -2,7 +2,7 @@
 
 ;;; Commentary:
 
-;; Tests for Task Group 2: Output Parsing & Data Structures
+;; Tests for Output Parsing & Data Structures
 ;;
 ;; This file contains focused tests for the parsing layer of the magit-like
 ;; status buffer feature. Tests verify that jj command outputs are correctly
