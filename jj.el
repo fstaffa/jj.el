@@ -95,9 +95,9 @@ Uses shadow face for dimmed/grey appearance."
 (defun jj--debug-log (format-string &rest args)
   "Log a debug message to *Messages* buffer when `jj-debug-mode' is enabled.
 FORMAT-STRING and ARGS are passed to `format' to construct the message.
-Messages are prefixed with \"[jj-debug]\" for easy filtering."
+Messages are prefixed with \"[jj-debug] \" for easy filtering."
   (when jj-debug-mode
-    (apply #'message (concat "[jj-debug]" format-string) args)))
+    (apply #'message (concat "[jj-debug] " format-string) args)))
 
 ;;; Command Execution Infrastructure
 
