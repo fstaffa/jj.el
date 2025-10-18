@@ -7,6 +7,8 @@
 
 (package-file "jj.el")
 
+(files "jj.el")
+
 (script "test" "eask exec buttercup -L . -L tests tests/")
 (script "coverage" "eask exec emacs --batch --load scripts/run-coverage-proper.el")
 
