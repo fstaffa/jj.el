@@ -24,9 +24,7 @@
   (describe "jj-status--item-at-point"
     (it "should return file item when on a file line"
       (with-temp-buffer
-        (jj-status-mode)
         (let ((file-data '(:path "test.txt" :status "M"))
-              (inhibit-read-only t)
               (start (point)))
           (insert (propertize "M  test.txt\n" 'jj-item file-data))
           (goto-char start)
@@ -36,9 +34,7 @@
 
     (it "should return revision item when on a revision line"
       (with-temp-buffer
-        (jj-status-mode)
         (let ((rev-data '(:change-id "qpvuntsm" :description "Test"))
-              (inhibit-read-only t)
               (start (point)))
           (insert (propertize "@  qpvuntsm  Test\n" 'jj-item rev-data))
           (goto-char start)
@@ -96,9 +92,7 @@
   (describe "jj-status-show-diff"
     (it "should show placeholder message for files"
       (with-temp-buffer
-        (jj-status-mode)
-        (let ((inhibit-read-only t)
-              (start (point)))
+        (let ((start (point)))
           (insert (propertize "M  test.txt\n" 'jj-item '(:path "test.txt" :status "M")))
           (goto-char start)
           ;; Function shows message, doesn't throw error
@@ -107,9 +101,7 @@
 
     (it "should show placeholder message for revisions"
       (with-temp-buffer
-        (jj-status-mode)
-        (let ((inhibit-read-only t)
-              (start (point)))
+        (let ((start (point)))
           (insert (propertize "@  qpvuntsm  Working copy\n" 'jj-item '(:change-id "qpvuntsm")))
           (goto-char start)
           ;; Function shows message, doesn't throw error
