@@ -59,3 +59,48 @@ Bookmarks
 4. Press ~s~ to stage that file to the last revision with a description
 5. The buffer auto-refreshes, showing the updated state
 6. Repeat for other files to organize changes across your revision stack
+
+*** Evil Mode Integration
+
+For Evil mode users, ~jj.el~ provides an optional integration package ~jj-evil.el~ that sets up Evil-friendly keybindings for all jj modes. The keybindings mirror the standard bindings to ensure consistent behavior whether or not Evil mode is active.
+
+**** Installation
+
+Add to your Emacs configuration:
+
+#+BEGIN_SRC emacs-lisp
+;; Load jj-evil after both jj and evil are loaded
+(with-eval-after-load 'evil
+  (require 'jj-evil)
+  (jj-evil-mode 1))
+#+END_SRC
+
+Or with ~use-package~:
+
+#+BEGIN_SRC emacs-lisp
+(use-package jj-evil
+  :after (jj evil)
+  :config
+  (jj-evil-mode 1))
+#+END_SRC
+
+**** Additional Evil Keybindings
+
+When ~jj-evil-mode~ is enabled, the following additional Vim-style bindings are available:
+
+***** Status Buffer (~jj-status-mode~)
+
+| Key     | Command       | Description                   |
+|---------+---------------+-------------------------------|
+| ~j~     | Next item     | Move to next file/revision    |
+| ~k~     | Previous item | Move to previous file/revision|
+| ~g r~   | Refresh       | Refresh the status buffer     |
+
+***** Describe Buffer (~jj-describe-mode~)
+
+| Key   | Command | Description                        |
+|-------+---------+------------------------------------|
+| ~Z Z~ | Finish  | Complete the describe operation    |
+| ~Z Q~ | Cancel  | Cancel the describe operation      |
+
+All standard keybindings (~n~, ~p~, ~s~, ~g~, ~q~, etc.) continue to work in Evil normal state.
