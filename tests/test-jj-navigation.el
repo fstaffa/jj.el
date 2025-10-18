@@ -25,9 +25,9 @@
     (it "should return file item when on a file line"
       (with-temp-buffer
         (let ((file-data '(:path "test.txt" :status "M")))
-          (insert (propertize "M  test.txt\n" 'jj-item file-data))
+          (insert "M  test.txt\n")
+          (put-text-property (point-min) (point-max) 'jj-item file-data)
           (goto-char (point-min))
-          (forward-char 1)  ; Move to position definitely within the propertized text
           (let ((result (jj-status--item-at-point)))
             (expect (plist-get result :type) :to-be 'file)
             (expect (plist-get result :data) :to-equal file-data)))))
@@ -35,9 +35,9 @@
     (it "should return revision item when on a revision line"
       (with-temp-buffer
         (let ((rev-data '(:change-id "qpvuntsm" :description "Test")))
-          (insert (propertize "@  qpvuntsm  Test\n" 'jj-item rev-data))
+          (insert "@  qpvuntsm  Test\n")
+          (put-text-property (point-min) (point-max) 'jj-item rev-data)
           (goto-char (point-min))
-          (forward-char 1)  ; Move to position definitely within the propertized text
           (let ((result (jj-status--item-at-point)))
             (expect (plist-get result :type) :to-be 'revision)
             (expect (plist-get result :data) :to-equal rev-data)))))
@@ -92,20 +92,20 @@
   (describe "jj-status-show-diff"
     (it "should show placeholder message for files"
       (with-temp-buffer
-        (let ((start (point)))
-          (insert (propertize "M  test.txt\n" 'jj-item '(:path "test.txt" :status "M")))
-          (goto-char start)
-          ;; Function shows message, doesn't throw error
-          (jj-status-show-diff)
-          (expect t :to-be t))))
+        (insert "M  test.txt\n")
+        (put-text-property (point-min) (point-max) 'jj-item '(:path "test.txt" :status "M"))
+        (goto-char (point-min))
+        ;; Function shows message, doesn't throw error
+        (jj-status-show-diff)
+        (expect t :to-be t)))
 
     (it "should show placeholder message for revisions"
       (with-temp-buffer
-        (let ((start (point)))
-          (insert (propertize "@  qpvuntsm  Working copy\n" 'jj-item '(:change-id "qpvuntsm")))
-          (goto-char start)
-          ;; Function shows message, doesn't throw error
-          (jj-status-show-diff)
-          (expect t :to-be t))))))
+        (insert "@  qpvuntsm  Working copy\n")
+        (put-text-property (point-min) (point-max) 'jj-item '(:change-id "qpvuntsm"))
+        (goto-char (point-min))
+        ;; Function shows message, doesn't throw error
+        (jj-status-show-diff)
+        (expect t :to-be t)))))
 
 ;;; test-jj-navigation.el ends here
