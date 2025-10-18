@@ -295,46 +295,25 @@
             :expected-success t))))
     (dolist (test-case test-cases)
       (it (plist-get test-case :description)
-        (let ((captured-directory nil)
-              (captured-command nil)
-              (exit-code (plist-get test-case :exit-code))
-              (stdout (plist-get test-case :stdout))
-              (stderr (plist-get test-case :stderr))
-              (project-folder (or (plist-get test-case :project-folder) "/tmp/test/")))
-          (cl-letf (((symbol-function 'call-process)
-                     (lambda (program infile destination _display &rest args)
-                       (setq captured-command (cons program args))
-                       (setq captured-directory default-directory)
-                       (when destination
-                         (let ((stdout-buf (cond
-                                            ;; Cons cell: (stdout . stderr)
-                                            ((consp destination) (car destination))
-                                            ;; Single buffer
-                                            (t destination)))
-                               (stderr-buf (when (consp destination)
-                                             ;; For cons cell, cdr is the stderr buffer
-                                             (cdr destination))))
-                           (when stdout-buf
-                             (with-current-buffer stdout-buf
-                               (insert stdout)))
-                           (when stderr-buf
-                             (with-current-buffer stderr-buf
-                               (insert stderr)))))
-                       exit-code)))
+        (let* ((command (plist-get test-case :command))
+               (exit-code (plist-get test-case :exit-code))
+               (stdout (plist-get test-case :stdout))
+               (stderr (plist-get test-case :stderr))
+               (project-folder (or (plist-get test-case :project-folder) "/tmp/test/"))
+               (cmd-list (list command))
+               (expected-args (jj-test--build-args cmd-list)))
+          (jj-test-with-mocked-command
+            (list (list "jj" expected-args
+                        :exit-code exit-code
+                        :stdout stdout
+                        :stderr stderr))
             (jj-test-with-project-folder project-folder
-              (let ((result (jj--run-command (list (plist-get test-case :command)))))
+              (let ((result (jj--run-command cmd-list)))
                 ;; Verify result structure: (success-flag stdout stderr exit-code)
                 (expect (car result) :to-be (plist-get test-case :expected-success))
                 (expect (cadr result) :to-equal stdout)
                 (expect (caddr result) :to-equal stderr)
-                (expect (cadddr result) :to-equal exit-code)
-                ;; Verify execution directory
-                (expect captured-directory :to-equal project-folder)
-                ;; Verify command construction
-                (expect (car captured-command) :to-equal "jj")
-                (expect (member "--no-pager" (cdr captured-command)) :to-be-truthy)
-                (expect (member "--color" (cdr captured-command)) :to-be-truthy)
-                (expect (member "never" (cdr captured-command)) :to-be-truthy)))))))))
+                (expect (cadddr result) :to-equal exit-code)))))))))
 
 ;; Regression Test: Cons Cell Format for call-process DESTINATION
 ;; ---------------------------------------------------------------

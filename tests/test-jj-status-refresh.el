@@ -2,7 +2,7 @@
 
 ;;; Commentary:
 
-;; Tests for Task Group 6: Buffer Refresh System
+;; Tests for Buffer Refresh System
 ;; =============================================
 ;;
 ;; This file tests the buffer refresh functionality for the magit-like
