@@ -26,8 +26,8 @@
       (with-temp-buffer
         (let ((file-data '(:path "test.txt" :status "M")))
           (insert "M  test.txt\n")
-          (put-text-property (point-min) (point-max) 'jj-item file-data)
-          (goto-char (point-min))
+          (put-text-property 1 (1- (point-max)) 'jj-item file-data)
+          (goto-char 1)
           (let ((result (jj-status--item-at-point)))
             (expect (plist-get result :type) :to-be 'file)
             (expect (plist-get result :data) :to-equal file-data)))))
@@ -36,8 +36,8 @@
       (with-temp-buffer
         (let ((rev-data '(:change-id "qpvuntsm" :description "Test")))
           (insert "@  qpvuntsm  Test\n")
-          (put-text-property (point-min) (point-max) 'jj-item rev-data)
-          (goto-char (point-min))
+          (put-text-property 1 (1- (point-max)) 'jj-item rev-data)
+          (goto-char 1)
           (let ((result (jj-status--item-at-point)))
             (expect (plist-get result :type) :to-be 'revision)
             (expect (plist-get result :data) :to-equal rev-data)))))
@@ -93,8 +93,8 @@
     (it "should show placeholder message for files"
       (with-temp-buffer
         (insert "M  test.txt\n")
-        (put-text-property (point-min) (point-max) 'jj-item '(:path "test.txt" :status "M"))
-        (goto-char (point-min))
+        (put-text-property 1 (1- (point-max)) 'jj-item '(:path "test.txt" :status "M"))
+        (goto-char 1)
         ;; Function shows message, doesn't throw error
         (jj-status-show-diff)
         (expect t :to-be t)))
@@ -102,8 +102,8 @@
     (it "should show placeholder message for revisions"
       (with-temp-buffer
         (insert "@  qpvuntsm  Working copy\n")
-        (put-text-property (point-min) (point-max) 'jj-item '(:change-id "qpvuntsm"))
-        (goto-char (point-min))
+        (put-text-property 1 (1- (point-max)) 'jj-item '(:change-id "qpvuntsm"))
+        (goto-char 1)
         ;; Function shows message, doesn't throw error
         (jj-status-show-diff)
         (expect t :to-be t)))))
