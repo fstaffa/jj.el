@@ -1,0 +1,15 @@
+task_assignments:
+  - task_group: "Task Group 1: Refactor jj--get-project-name Tests"
+    assigned_subagent: "testing-engineer"
+
+  - task_group: "Task Group 2: Refactor jj--bookmarks-get Tests"
+    assigned_subagent: "testing-engineer"
+
+  - task_group: "Task Group 3: Refactor jj--log-count-revs Tests"
+    assigned_subagent: "testing-engineer"
+
+  - task_group: "Task Group 4: Refactor jj--run-command Tests"
+    assigned_subagent: "testing-engineer"
+
+  - task_group: "Task Group 5: Update Documentation and Final Validation"
+    assigned_subagent: "testing-engineer"

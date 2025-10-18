@@ -1,0 +1,8 @@
+feature/new-ui
+fix bug-123
+dev_branch
+release-2.0
+hotfix/critical_issue
+user-name/branch
+test.branch.name
+WIP-experimental

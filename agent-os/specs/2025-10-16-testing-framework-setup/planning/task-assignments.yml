@@ -1,0 +1,12 @@
+task_assignments:
+  - task_group: "Task Group 1: Eask Test Configuration and Test Helpers"
+    assigned_subagent: "testing-engineer"
+
+  - task_group: "Task Group 2: Test Fixtures Creation"
+    assigned_subagent: "testing-engineer"
+
+  - task_group: "Task Group 3: Unit Tests for Core Functions"
+    assigned_subagent: "testing-engineer"
+
+  - task_group: "Task Group 4: Test Suite Integration and Documentation"
+    assigned_subagent: "testing-engineer"

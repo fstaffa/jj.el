@@ -1,0 +1,8 @@
+Error: Failed to parse revset: Syntax error
+Expected expression of type "revset", but got "template" of type "template"
+Caused by:  --> <string>:1:1
+  |
+1 | invalid parse error +++
+  | ^-----^
+  |
+  = Expected expression of type "revset"

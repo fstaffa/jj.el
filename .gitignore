@@ -6,3 +6,5 @@ tmp/
 .direnv
 .eask
 .aider*
+/coverage/
+*.elc
