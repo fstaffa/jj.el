@@ -24,11 +24,11 @@
   (describe "jj-status--item-at-point"
     (it "should return file item when on a file line"
       (with-temp-buffer
-        (jj-status-mode)
-        (let ((file-data '(:path "test.txt" :status "M"))
-              (inhibit-read-only t))
-          (insert "M  test.txt\n")
-          (put-text-property 1 (1- (point-max)) 'jj-item file-data)
+        (let ((file-data '(:path "test.txt" :status "M")))
+          (let ((inhibit-read-only t))
+            (insert "M  test.txt\n")
+            (put-text-property 1 (1- (point-max)) 'jj-item file-data)
+            (jj-status-mode))
           (goto-char 1)
           (let ((result (jj-status--item-at-point)))
             (expect (plist-get result :type) :to-be 'file)
@@ -36,11 +36,11 @@
 
     (it "should return revision item when on a revision line"
       (with-temp-buffer
-        (jj-status-mode)
-        (let ((rev-data '(:change-id "qpvuntsm" :description "Test"))
-              (inhibit-read-only t))
-          (insert "@  qpvuntsm  Test\n")
-          (put-text-property 1 (1- (point-max)) 'jj-item rev-data)
+        (let ((rev-data '(:change-id "qpvuntsm" :description "Test")))
+          (let ((inhibit-read-only t))
+            (insert "@  qpvuntsm  Test\n")
+            (put-text-property 1 (1- (point-max)) 'jj-item rev-data)
+            (jj-status-mode))
           (goto-char 1)
           (let ((result (jj-status--item-at-point)))
             (expect (plist-get result :type) :to-be 'revision)
