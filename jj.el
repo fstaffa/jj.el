@@ -566,10 +566,7 @@ Example:
 (defun jj-status--mark-item-bounds (start end item-plist)
   "Mark text between START and END with jj-item text property.
 ITEM-PLIST is the file or revision plist to associate with this region."
-  (add-text-properties start end
-                       (list 'jj-item item-plist
-                             'front-sticky '(jj-item)
-                             'rear-nonsticky '(jj-item))))
+  (put-text-property start end 'jj-item item-plist))
 
 (defun jj-status--item-at-point ()
   "Return plist identifying item under cursor.
