@@ -24,20 +24,20 @@
   (describe "jj-status--item-at-point"
     (it "should return file item when on a file line"
       (with-temp-buffer
-        (let ((file-data '(:path "test.txt" :status "M"))
-              (start (point)))
+        (let ((file-data '(:path "test.txt" :status "M")))
           (insert (propertize "M  test.txt\n" 'jj-item file-data))
-          (goto-char start)
+          (goto-char (point-min))
+          (forward-char 1)  ; Move to position definitely within the propertized text
           (let ((result (jj-status--item-at-point)))
             (expect (plist-get result :type) :to-be 'file)
             (expect (plist-get result :data) :to-equal file-data)))))
 
     (it "should return revision item when on a revision line"
       (with-temp-buffer
-        (let ((rev-data '(:change-id "qpvuntsm" :description "Test"))
-              (start (point)))
+        (let ((rev-data '(:change-id "qpvuntsm" :description "Test")))
           (insert (propertize "@  qpvuntsm  Test\n" 'jj-item rev-data))
-          (goto-char start)
+          (goto-char (point-min))
+          (forward-char 1)  ; Move to position definitely within the propertized text
           (let ((result (jj-status--item-at-point)))
             (expect (plist-get result :type) :to-be 'revision)
             (expect (plist-get result :data) :to-equal rev-data)))))
