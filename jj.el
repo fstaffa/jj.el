@@ -63,7 +63,6 @@ Bound to q key in jj-status-mode."
 (define-derived-mode jj-status-mode special-mode "jj-status"
   "Major mode for displaying Jujutsu status."
   :group 'jj
-  :
   (setq buffer-read-only t))
 
 ;;; Custom Faces for Status Buffer
@@ -567,7 +566,10 @@ Example:
 (defun jj-status--mark-item-bounds (start end item-plist)
   "Mark text between START and END with jj-item text property.
 ITEM-PLIST is the file or revision plist to associate with this region."
-  (put-text-property start end 'jj-item item-plist))
+  (add-text-properties start end
+                       (list 'jj-item item-plist
+                             'front-sticky '(jj-item)
+                             'rear-nonsticky '(jj-item))))
 
 (defun jj-status--item-at-point ()
   "Return plist identifying item under cursor.
