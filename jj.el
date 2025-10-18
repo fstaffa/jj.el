@@ -60,11 +60,18 @@ Bound to q key in jj-status-mode."
 
 ;;; Major Mode Definition
 
+(defvar-local jj-status--parsed-data nil
+  "Buffer-local variable storing parsed jj data structures.
+Plist containing :revisions, :files, and :bookmarks from last fetch.")
+
 (define-derived-mode jj-status-mode special-mode "jj-status"
   "Major mode for displaying Jujutsu status."
   :group 'jj
   :
-  (setq buffer-read-only t))
+  (setq buffer-read-only t)
+  ;; Disable font-lock to prevent it from interfering with text properties
+  (setq font-lock-defaults nil)
+  (font-lock-mode -1))
 
 ;;; Custom Faces for Status Buffer
 ;; Task Group 3: Buffer Rendering System
@@ -796,14 +803,15 @@ Error messages:
       ;; Render buffer
       (let ((buffer (get-buffer-create (format "jj: %s" (jj--get-project-name)))))
         (with-current-buffer buffer
-          ;; Render buffer with text properties FIRST
+          ;; Enable mode FIRST if not already enabled
+          (unless (eq major-mode 'jj-status-mode)
+            (jj-status-mode))
+          ;; Render buffer with text properties (inhibit-read-only protects against mode's read-only setting)
           (jj-status--render-buffer revisions files bookmarks)
-          ;; Enable mode AFTER text properties are set (Emacs 29.4 compatibility)
-          (jj-status-mode)
-          ;; Store parsed data AFTER mode is enabled (mode may clear local vars)
-          (setq-local jj-status--parsed-data (list :revisions revisions
-                                                    :files files
-                                                    :bookmarks bookmarks)))
+          ;; Store parsed data AFTER mode is enabled
+          (setq jj-status--parsed-data (list :revisions revisions
+                                              :files files
+                                              :bookmarks bookmarks)))
         (switch-to-buffer buffer)))))
 
 
