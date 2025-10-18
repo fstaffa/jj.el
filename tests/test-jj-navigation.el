@@ -24,7 +24,9 @@
   (describe "jj-status--item-at-point"
     (it "should return file item when on a file line"
       (with-temp-buffer
-        (let ((file-data '(:path "test.txt" :status "M")))
+        (jj-status-mode)
+        (let ((file-data '(:path "test.txt" :status "M"))
+              (inhibit-read-only t))
           (insert "M  test.txt\n")
           (put-text-property 1 (1- (point-max)) 'jj-item file-data)
           (goto-char 1)
@@ -34,7 +36,9 @@
 
     (it "should return revision item when on a revision line"
       (with-temp-buffer
-        (let ((rev-data '(:change-id "qpvuntsm" :description "Test")))
+        (jj-status-mode)
+        (let ((rev-data '(:change-id "qpvuntsm" :description "Test"))
+              (inhibit-read-only t))
           (insert "@  qpvuntsm  Test\n")
           (put-text-property 1 (1- (point-max)) 'jj-item rev-data)
           (goto-char 1)
@@ -92,20 +96,24 @@
   (describe "jj-status-show-diff"
     (it "should show placeholder message for files"
       (with-temp-buffer
-        (insert "M  test.txt\n")
-        (put-text-property 1 (1- (point-max)) 'jj-item '(:path "test.txt" :status "M"))
-        (goto-char 1)
-        ;; Function shows message, doesn't throw error
-        (jj-status-show-diff)
-        (expect t :to-be t)))
+        (jj-status-mode)
+        (let ((inhibit-read-only t))
+          (insert "M  test.txt\n")
+          (put-text-property 1 (1- (point-max)) 'jj-item '(:path "test.txt" :status "M"))
+          (goto-char 1)
+          ;; Function shows message, doesn't throw error
+          (jj-status-show-diff)
+          (expect t :to-be t))))
 
     (it "should show placeholder message for revisions"
       (with-temp-buffer
-        (insert "@  qpvuntsm  Working copy\n")
-        (put-text-property 1 (1- (point-max)) 'jj-item '(:change-id "qpvuntsm"))
-        (goto-char 1)
-        ;; Function shows message, doesn't throw error
-        (jj-status-show-diff)
-        (expect t :to-be t)))))
+        (jj-status-mode)
+        (let ((inhibit-read-only t))
+          (insert "@  qpvuntsm  Working copy\n")
+          (put-text-property 1 (1- (point-max)) 'jj-item '(:change-id "qpvuntsm"))
+          (goto-char 1)
+          ;; Function shows message, doesn't throw error
+          (jj-status-show-diff)
+          (expect t :to-be t))))))
 
 ;;; test-jj-navigation.el ends here
