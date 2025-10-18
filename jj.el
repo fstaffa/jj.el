@@ -101,19 +101,27 @@ Messages are prefixed with \"[jj-debug]\" for easy filtering."
 
 ;;; Command Execution Infrastructure
 
-(defun jj--run-command (command)
-  "Run a jj COMMAND from the project root.
+(defun jj--run-command (args)
+  "Run a jj command with ARGS from the project root.
+ARGS can be a list of arguments or a nested list structure.
+Nested lists are flattened using `flatten-tree'.
+
 Returns a list: (success-flag stdout stderr exit-code)
-where success-flag is t if exit-code is 0, nil otherwise."
-  (jj--debug-log "Command: jj %s" command)
+where success-flag is t if exit-code is 0, nil otherwise.
+
+Example:
+  (jj--run-command '(\"status\"))
+  (jj--run-command (list \"log\" \"-r\" my-revset))"
   (let* ((default-directory (jj--get-project-folder))
          (stdout-buffer (generate-new-buffer " *jj-stdout*"))
          (stderr-buffer (generate-new-buffer " *jj-stderr*"))
          (exit-code nil)
          (stdout "")
          (stderr "")
+         ;; Flatten nested lists and prepend global args
          (cmd-args (append '("--no-pager" "--color" "never")
-                           (split-string-and-unquote command))))
+                           (flatten-tree args))))
+    (jj--debug-log "Command: jj %s" (string-join cmd-args " "))
     (unwind-protect
         (progn
           ;; Call call-process with explicit argument list to avoid apply issues
@@ -162,17 +170,20 @@ Signals `user-error' if not in a jj repository."
 
 (defun jj--write-error-buffer (command exit-code stderr stdout)
   "Write detailed error context to the error buffer.
-COMMAND is the jj command that failed.
+COMMAND is the jj command that failed (can be string or list).
 EXIT-CODE is the exit code returned by the command.
 STDERR is the stderr output from the command.
 STDOUT is the stdout output from the command."
-  (let ((error-buffer (get-buffer-create jj-error-buffer-name)))
+  (let ((error-buffer (get-buffer-create jj-error-buffer-name))
+        (command-str (if (listp command)
+                         (string-join (flatten-tree command) " ")
+                       command)))
     (with-current-buffer error-buffer
       (goto-char (point-max))
       (insert (format "===============================================================================\n"))
       (insert (format "Error at: %s\n" (format-time-string "%Y-%m-%d %H:%M:%S")))
       (insert (format "===============================================================================\n\n"))
-      (insert (format "Command: jj %s\n" command))
+      (insert (format "Command: jj %s\n" command-str))
       (insert (format "Exit Code: %d\n\n" exit-code))
       (insert (format "--- Stderr ---\n%s\n" (if (string-empty-p stderr) "<empty>" stderr)))
       (insert (format "--- Stdout ---\n%s\n" (if (string-empty-p stdout) "<empty>" stdout)))
@@ -180,7 +191,7 @@ STDOUT is the stdout output from the command."
 
 (defun jj--handle-command-error (command exit-code stderr stdout)
   "Handle command errors by categorizing and signaling appropriate error type.
-COMMAND is the jj command that failed.
+COMMAND is the jj command that failed (can be string or list).
 EXIT-CODE is the exit code returned by the command.
 STDERR is the stderr output from the command.
 STDOUT is the stdout output from the command.
@@ -190,23 +201,26 @@ Error categorization:
 - Command failures (exit codes 1-255): signals `error'
 - System errors (binary not found): signals `error'"
   ;; Log error handling
-  (jj--debug-log "Handling command error: command=%s exit-code=%d" command exit-code)
+  (let ((command-str (if (listp command)
+                         (string-join (flatten-tree command) " ")
+                       command)))
+    (jj--debug-log "Handling command error: command=%s exit-code=%d" command-str exit-code)
 
-  ;; Write error context to buffer before signaling
-  (jj--write-error-buffer command exit-code stderr stdout)
+    ;; Write error context to buffer before signaling
+    (jj--write-error-buffer command exit-code stderr stdout)
 
-  ;; Categorize and signal appropriate error
-  (cond
-   ;; User errors: exit codes 1-2 or "invalid" in stderr
-   ((or (and (>= exit-code 1) (<= exit-code 2))
-        (string-match-p "invalid" stderr))
-    (jj--debug-log "Error type: user-error")
-    (user-error "jj command failed: %s (exit code %d)" command exit-code))
+    ;; Categorize and signal appropriate error
+    (cond
+     ;; User errors: exit codes 1-2 or "invalid" in stderr
+     ((or (and (>= exit-code 1) (<= exit-code 2))
+          (string-match-p "invalid" stderr))
+      (jj--debug-log "Error type: user-error")
+      (user-error "jj command failed: %s (exit code %d)" command-str exit-code))
 
-   ;; Command failures: all other non-zero exit codes
-   (t
-    (jj--debug-log "Error type: command-failure")
-    (error "jj command failed: %s (exit code %d)" command exit-code))))
+     ;; Command failures: all other non-zero exit codes
+     (t
+      (jj--debug-log "Error type: command-failure")
+      (error "jj command failed: %s (exit code %d)" command-str exit-code)))))
 
 ;;; Status Buffer Command Execution Functions
 
@@ -216,14 +230,14 @@ Executes: jj log --revisions \"immutable_heads()..@\"
 with custom template for change_id, description, and bookmarks.
 Returns raw command output string with graph (graph is shown by default).
 The graph symbols appear on the left of each line."
-  (jj--with-command "log --revisions \"immutable_heads()..@\" -T \"change_id ++ ' | ' ++ description.first_line() ++ ' | ' ++ bookmarks\""
+  (jj--with-command '("log" "--revisions" "immutable_heads()..@" "-T" "change_id ++ ' | ' ++ description.first_line() ++ ' | ' ++ bookmarks")
     stdout))
 
 (defun jj-status--fetch-working-copy-status ()
   "Fetch working copy status from jj status command.
 Executes: jj status
 Returns raw command output string."
-  (jj--with-command "status"
+  (jj--with-command '("status")
     stdout))
 
 (defun jj-status--fetch-bookmark-list ()
@@ -231,7 +245,7 @@ Returns raw command output string."
 Executes: jj bookmark list (uses default output format).
 Returns raw command output string.
 Default format: name: change_id commit_id description"
-  (jj--with-command "bookmark list"
+  (jj--with-command '("bookmark" "list")
     stdout))
 
 
@@ -361,8 +375,7 @@ the shortest unique prefix. Falls back to first 8 characters if query fails.
 Example:
   (jj-status--determine-unique-prefix \"qpvuntsmqxuquz57\")
   => (:unique-prefix \"qpvuntsm\" :full-id \"qpvuntsmqxuquz57\")"
-  (let* ((cmd (format "log -r %s -T 'shortest(change_id)' --no-graph" change-id))
-         (result (jj--run-command cmd))
+  (let* ((result (jj--run-command (list "log" "-r" change-id "-T" "shortest(change_id)" "--no-graph")))
          (success (car result))
          (stdout (cadr result)))
     (if success
@@ -664,9 +677,9 @@ Uses `jj--with-command' for consistent error handling.
 Example:
   (jj-status--validate-staging-target \"abc123\")
   => t  ; if abc123 is mutable"
-  (let* ((result (jj--run-command "log -r \"immutable_heads()\" -T 'change_id' --no-graph"))
-        (success (car result))
-        (stdout (cadr result)))
+  (let* ((result (jj--run-command '("log" "-r" "immutable_heads()" "-T" "change_id" "--no-graph")))
+         (success (car result))
+         (stdout (cadr result)))
     (if success
         (let ((immutable-ids (split-string (string-trim stdout) "\n" t)))
           (not (member change-id immutable-ids)))
@@ -739,13 +752,10 @@ Error messages:
           (user-error "Cannot stage to immutable revision"))
 
         ;; Execute squash command
-        (let ((cmd (format "squash --from @ --into %s %s"
-                           target-change-id
-                           file-path)))
-          (jj--with-command cmd
-            (let ((prefix (substring target-change-id 0 (min 8 (length target-change-id)))))
-              (message "Staged %s to %s" file-path prefix))
-            (jj-status-refresh)))))))
+        (jj--with-command (list "squash" "--from" "@" "--into" target-change-id file-path)
+          (let ((prefix (substring target-change-id 0 (min 8 (length target-change-id)))))
+            (message "Staged %s to %s" file-path prefix))
+          (jj-status-refresh))))))
 
 ;;; User-Facing Commands
 
@@ -776,22 +786,20 @@ Error messages:
 (defun jj-status-describe (args)
   "Run jj describe with ARGS."
   (interactive (list (transient-args 'jj-status-describe-popup)))
-  (let ((cmd (concat "describe " (string-join args " "))))
-    (jj--with-command cmd
-      (jj-status))))
+  (jj--with-command (cons "describe" args)
+    (jj-status)))
 
 (transient-define-prefix jj-status-describe-popup ()
   "Popup for jujutsu describe comand."
   ["Options"
-   ("-m" "Message" "-m " :reader (lambda (&rest _args) (shell-quote-argument (read-string "Message: "))))]
+   ("-m" "Message" "-m" :reader (lambda (&rest _args) (read-string "Message: ")))]
   ["Actions"
    ("d" "Describe" jj-status-describe)])
 
 (defun jj--log-count-revs (revset)
   "Count number of revisions in log for REVSET."
-  (let ((cmd (format "log -T '\"a\"' --revisions \"%s\" --no-graph" revset)))
-    (jj--with-command cmd
-      (length stdout))))
+  (jj--with-command (list "log" "-T" "\"a\"" "--revisions" revset "--no-graph")
+    (length stdout)))
 
 (defun jj--status-abandon-revset-from-trunk ()
   "Prompt for branch name and create revset from trunk."
@@ -802,11 +810,11 @@ Error messages:
                   (jj--bookmarks-select)))
          (revision-count (jj--log-count-revs jj-current-revset)))
     (if (y-or-n-p (format "Abandon %d revisions? " revision-count))
-        (jj-status-abandon (append (list (format "\"%s\""  jj-current-revset)))))))
+        (jj-status-abandon (list jj-current-revset)))))
 
 (defun jj--bookmarks-get ()
   "Get list of bookmarks from jj repository."
-  (jj--with-command "bookmark list -T 'name ++ \"\n\"'"
+  (jj--with-command '("bookmark" "list" "-T" "name ++ \"\\n\"")
     (s-split "\n" stdout 't)))
 
 (defun jj--bookmarks-select ()
@@ -817,9 +825,8 @@ Error messages:
 (defun jj-status-abandon (args)
   "Run jj abandon with ARGS."
   (interactive (list (transient-args 'jj-status-abandon-popup)))
-  (let ((cmd (concat "abandon " (string-join args " "))))
-    (jj--with-command cmd
-      (jj-status))))
+  (jj--with-command (cons "abandon" args)
+    (jj-status)))
 
 (transient-define-prefix jj-status-abandon-popup ()
   "Popup for jujutsu abandon comand."
@@ -829,13 +836,12 @@ Error messages:
 (defun jj--log (args)
   "Run jj log with ARGS."
   (interactive (list (transient-args 'jj-status-log-popup)))
-  (let* ((cmd (concat "log " (string-join args " "))))
-    (jj--log-show cmd)))
+  (jj--log-show (cons "log" args)))
 
-(defun jj--log-show (cmd)
-  "Show log for given CMD."
+(defun jj--log-show (args)
+  "Show log for given ARGS."
   (interactive)
-  (jj--with-command cmd
+  (jj--with-command args
     (let ((buffer (get-buffer-create (format "jj log: %s" (jj--get-project-name)))))
       (with-current-buffer buffer
         (let ((inhibit-read-only t))
@@ -846,7 +852,7 @@ Error messages:
 
 (defun jj--revset-read (&rest _args)
   "Read revset from user."
-  (s-concat "\"" (read-string "-r ") "\""))
+  (read-string "-r "))
 
 (transient-define-prefix jj-status-log-popup ()
   "Popup for jujutsu log command"
@@ -896,9 +902,8 @@ Error messages:
 (defun jj--new (args)
   "Run jj new with ARGS."
   (interactive (list (transient-args 'jj-status-new-popup)))
-  (let ((cmd (string-join (append '("new") (transient-scope) args) " ")))
-    (jj--with-command cmd
-      (jj-status))))
+  (jj--with-command (append '("new") (transient-scope) args)
+    (jj-status)))
 
 (transient-define-prefix jj-status-new-popup ()
   "Popup for jujutsu new command."
@@ -909,7 +914,7 @@ Error messages:
    ]
 
   ["Options"
-   ("-m" "Message" "-m " :reader (lambda (&rest _args) (shell-quote-argument (read-string "Message: "))))
+   ("-m" "Message" "-m" :reader (lambda (&rest _args) (read-string "Message: ")))
    ("-E" "Do not edit the newly created change" "--no-edit")
    ("-b" "Insert the new change before the given commit" "--insert-before" :reader jj--revset-read)
    ("-a" "Insert the new change after the given commit" "--insert-after" :reader jj--revset-read)
@@ -922,10 +927,9 @@ Error messages:
 (defun jj--fetch (args)
   "Run jj fetch with ARGS."
   (interactive (list (transient-args 'jj-fetch-popup)))
-  (let ((cmd (string-join (append '("git fetch") args) " ")))
-    (jj--with-command cmd
-      (message "Successfully fetched")
-      (jj-status))))
+  (jj--with-command (append '("git" "fetch") args)
+    (message "Successfully fetched")
+    (jj-status)))
 
 (transient-define-prefix jj-fetch-popup ()
   "Popup for jujutsu git fetch command"
@@ -941,9 +945,8 @@ Error messages:
 (defun jj--push (args)
   "Run jj push with ARGS."
   (interactive (list (transient-args 'jj-push-popup)))
-  (let ((cmd (string-join (append '("git push") args) " ")))
-    (jj--with-command cmd
-      (jj-status))))
+  (jj--with-command (append '("git" "push") args)
+    (jj-status)))
 
 (transient-define-prefix jj-push-popup ()
   "Popup for jujutsu git push command"
