@@ -796,8 +796,10 @@ Error messages:
       ;; Render buffer
       (let ((buffer (get-buffer-create (format "jj: %s" (jj--get-project-name)))))
         (with-current-buffer buffer
-          (jj-status--render-buffer revisions files bookmarks)
+          ;; Enable mode BEFORE setting text properties (Emacs 29.4 compatibility)
           (jj-status-mode)
+          ;; Now render buffer with text properties
+          (jj-status--render-buffer revisions files bookmarks)
           ;; Store parsed data for navigation and staging
           (setq-local jj-status--parsed-data (list :revisions revisions
                                                     :files files
