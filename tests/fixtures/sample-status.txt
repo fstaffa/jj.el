@@ -1,0 +1,4 @@
+Working copy changes:
+M test.txt
+Working copy  (@) : vykrrxmx e9d0887a Second commit
+Parent commit (@-): wpmvlnzv 074d0cdd dev-branch feature-branch main | Initial commit

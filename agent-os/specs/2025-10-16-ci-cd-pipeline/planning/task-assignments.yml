@@ -1,0 +1,16 @@
+task_assignments:
+  - task_group: "Task Group 1: Add Coverage and Linting Dependencies"
+    assigned_subagent: "general-purpose"
+    rationale: "CI/CD configuration work requiring GitHub Actions and Emacs tooling expertise"
+
+  - task_group: "Task Group 2: Add Three Linting Jobs to GitHub Actions"
+    assigned_subagent: "general-purpose"
+    rationale: "DevOps work for GitHub Actions workflow configuration and linting integration"
+
+  - task_group: "Task Group 3: Integrate Coverage Reporting with undercover.el"
+    assigned_subagent: "general-purpose"
+    rationale: "Complex CI/CD integration requiring coverage tooling and GitHub Actions API knowledge"
+
+  - task_group: "Task Group 4: Update Aggregation Job and Final Verification"
+    assigned_subagent: "general-purpose"
+    rationale: "Final workflow integration and end-to-end verification of CI/CD pipeline"

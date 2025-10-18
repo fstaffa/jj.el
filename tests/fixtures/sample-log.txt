@@ -1,0 +1,5 @@
+@  vykrrxmx test@example.com 2025-10-16 14:38:25 82707921
+│  (empty) Second commit
+○  wpmvlnzv test@example.com 2025-10-16 14:38:25 dev-branch feature-branch main git_head() 074d0cdd
+│  Initial commit
+◆  zzzzzzzz root() 00000000
