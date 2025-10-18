@@ -1,7 +1,8 @@
 ;;; test-jj-navigation.el --- Tests for jj-status navigation  -*- lexical-binding: t; -*-
 
 ;;; Commentary:
-;; Tests for Task Group 4: Navigation System
+;; High-level integration tests for Task Group 4: Navigation System
+;; Tests navigation functions on real jj-status buffers
 
 ;;; Code:
 
@@ -11,101 +12,198 @@
 
 (describe "Task Group 4: Navigation System"
 
-  (describe "jj-status--mark-item-bounds"
-    (it "should mark text region with jj-item property"
-      (with-temp-buffer
-        (insert "test line\n")
-        (let ((start (point-min))
-              (end (1- (point-max)))
-              (item-data '(:path "test.txt" :status "M")))
-          (jj-status--mark-item-bounds start end item-data)
-          (expect (get-text-property start 'jj-item) :to-equal item-data)))))
+  (describe "jj-status-next-item"
+    (it "should navigate to first file in Working Copy Changes section"
+      (jj-test-with-status-buffer
+        (:log-output "@  qpvuntsm | Working copy | \n◉  yqosqzyt | Add feature | main\n"
+         :status-output "Working copy changes:\nM file1.txt\nA file2.txt\n"
+         :bookmark-output "main: yqosqzyt abc123 Add feature\n")
+        ;; Start at beginning of buffer
+        (goto-char (point-min))
+        ;; Navigate to first item
+        (jj-status-next-item)
+        ;; Should be on a file item
+        (let ((item (get-text-property (point) 'jj-item)))
+          (expect item :not :to-be nil)
+          (expect (plist-get item :status) :to-equal "M")
+          (expect (plist-get item :path) :to-equal "file1.txt"))))
+
+    (it "should navigate between multiple files"
+      (jj-test-with-status-buffer
+        (:log-output "@  qpvuntsm | Working copy | \n"
+         :status-output "Working copy changes:\nM file1.txt\nA file2.txt\nR file3.txt\n"
+         :bookmark-output "")
+        (goto-char (point-min))
+        ;; Navigate to first file
+        (jj-status-next-item)
+        (expect (plist-get (get-text-property (point) 'jj-item) :path) :to-equal "file1.txt")
+        ;; Navigate to second file
+        (jj-status-next-item)
+        (expect (plist-get (get-text-property (point) 'jj-item) :path) :to-equal "file2.txt")
+        ;; Navigate to third file
+        (jj-status-next-item)
+        (expect (plist-get (get-text-property (point) 'jj-item) :path) :to-equal "file3.txt")))
+
+    (it "should navigate to revisions in Revisions section"
+      (jj-test-with-status-buffer
+        (:log-output "@  qpvuntsm | Working copy | \n◉  yqosqzyt | Add feature | main\n◉  mzvwutvl | Fix bug | \n"
+         :status-output "Working copy changes:\nM file1.txt\n"
+         :bookmark-output "")
+        ;; Start in files section
+        (goto-char (point-min))
+        (jj-status-next-item)
+        ;; Should be on file
+        (expect (plist-get (get-text-property (point) 'jj-item) :path) :to-equal "file1.txt")
+        ;; Navigate to first revision
+        (jj-status-next-item)
+        (let ((item (get-text-property (point) 'jj-item)))
+          (expect (plist-get item :change-id) :to-equal "qpvuntsm"))
+        ;; Navigate to second revision
+        (jj-status-next-item)
+        (let ((item (get-text-property (point) 'jj-item)))
+          (expect (plist-get item :change-id) :to-equal "yqosqzyt"))))
+
+    (it "should wrap around to beginning when at end of buffer"
+      (jj-test-with-status-buffer
+        (:log-output "@  qpvuntsm | Working copy | \n"
+         :status-output "Working copy changes:\nM file1.txt\n"
+         :bookmark-output "")
+        ;; Navigate to the file
+        (goto-char (point-min))
+        (jj-status-next-item)
+        (expect (plist-get (get-text-property (point) 'jj-item) :path) :to-equal "file1.txt")
+        ;; Navigate to revision
+        (jj-status-next-item)
+        (expect (plist-get (get-text-property (point) 'jj-item) :change-id) :to-equal "qpvuntsm")
+        ;; At end, should wrap to first item (file1.txt)
+        (jj-status-next-item)
+        (expect (plist-get (get-text-property (point) 'jj-item) :path) :to-equal "file1.txt")))
+
+    (it "should skip non-item lines (headers, blank lines)"
+      (jj-test-with-status-buffer
+        (:log-output "@  qpvuntsm | Working copy | \n"
+         :status-output "Working copy changes:\nM file1.txt\n"
+         :bookmark-output "")
+        ;; Start at point-min (on header)
+        (goto-char (point-min))
+        ;; First next-item should skip header and go to file
+        (jj-status-next-item)
+        (let ((item (get-text-property (point) 'jj-item)))
+          (expect item :not :to-be nil)
+          (expect (plist-get item :path) :to-equal "file1.txt")))))
+
+  (describe "jj-status-prev-item"
+    (it "should navigate backwards from revision to file"
+      (jj-test-with-status-buffer
+        (:log-output "@  qpvuntsm | Working copy | \n"
+         :status-output "Working copy changes:\nM file1.txt\n"
+         :bookmark-output "")
+        ;; Navigate to revision first
+        (goto-char (point-min))
+        (jj-status-next-item)
+        (jj-status-next-item)
+        (expect (plist-get (get-text-property (point) 'jj-item) :change-id) :to-equal "qpvuntsm")
+        ;; Now go back to file
+        (jj-status-prev-item)
+        (expect (plist-get (get-text-property (point) 'jj-item) :path) :to-equal "file1.txt")))
+
+    (it "should navigate backwards through multiple files"
+      (jj-test-with-status-buffer
+        (:log-output "@  qpvuntsm | Working copy | \n"
+         :status-output "Working copy changes:\nM file1.txt\nA file2.txt\nR file3.txt\n"
+         :bookmark-output "")
+        ;; Navigate to last file
+        (goto-char (point-min))
+        (jj-status-next-item)
+        (jj-status-next-item)
+        (jj-status-next-item)
+        (expect (plist-get (get-text-property (point) 'jj-item) :path) :to-equal "file3.txt")
+        ;; Navigate backwards
+        (jj-status-prev-item)
+        (expect (plist-get (get-text-property (point) 'jj-item) :path) :to-equal "file2.txt")
+        (jj-status-prev-item)
+        (expect (plist-get (get-text-property (point) 'jj-item) :path) :to-equal "file1.txt")))
+
+    (it "should wrap around to end when at beginning"
+      (jj-test-with-status-buffer
+        (:log-output "@  qpvuntsm | Working copy | \n"
+         :status-output "Working copy changes:\nM file1.txt\n"
+         :bookmark-output "")
+        ;; Navigate to first file
+        (goto-char (point-min))
+        (jj-status-next-item)
+        (expect (plist-get (get-text-property (point) 'jj-item) :path) :to-equal "file1.txt")
+        ;; Go backwards - should wrap to last item (revision)
+        (jj-status-prev-item)
+        (expect (plist-get (get-text-property (point) 'jj-item) :change-id) :to-equal "qpvuntsm"))))
 
   (describe "jj-status--item-at-point"
-    (it "should return file item when on a file line"
-      (with-temp-buffer
-        (let ((file-data '(:path "test.txt" :status "M")))
-          (insert "M  test.txt\n")
-          (put-text-property 1 (1- (point-max)) 'jj-item file-data)
-          (goto-char 1)
-          (let ((result (jj-status--item-at-point)))
-            (expect (plist-get result :type) :to-be 'file)
-            (expect (plist-get result :data) :to-equal file-data)))))
+    (it "should return file item when on file line"
+      (jj-test-with-status-buffer
+        (:log-output "@  qpvuntsm | Working copy | \n"
+         :status-output "Working copy changes:\nM file1.txt\n"
+         :bookmark-output "")
+        (goto-char (point-min))
+        (jj-status-next-item)
+        (let ((result (jj-status--item-at-point)))
+          (expect (plist-get result :type) :to-be 'file)
+          (expect (plist-get (plist-get result :data) :path) :to-equal "file1.txt")
+          (expect (plist-get (plist-get result :data) :status) :to-equal "M"))))
 
-    (it "should return revision item when on a revision line"
-      (with-temp-buffer
-        (let ((rev-data '(:change-id "qpvuntsm" :description "Test")))
-          (insert "@  qpvuntsm  Test\n")
-          (put-text-property 1 (1- (point-max)) 'jj-item rev-data)
-          (goto-char 1)
-          (let ((result (jj-status--item-at-point)))
-            (expect (plist-get result :type) :to-be 'revision)
-            (expect (plist-get result :data) :to-equal rev-data)))))
+    (it "should return revision item when on revision line"
+      (jj-test-with-status-buffer
+        (:log-output "@  qpvuntsm | Working copy | \n◉  yqosqzyt | Add feature | main\n"
+         :status-output "Working copy changes:\n"
+         :bookmark-output "")
+        (goto-char (point-min))
+        (jj-status-next-item)
+        (let ((result (jj-status--item-at-point)))
+          (expect (plist-get result :type) :to-be 'revision)
+          (expect (plist-get (plist-get result :data) :change-id) :to-equal "qpvuntsm")
+          (expect (plist-get (plist-get result :data) :description) :to-equal "Working copy"))))
 
-    (it "should return nil when on empty space"
-      (with-temp-buffer
-        (insert "Empty line\n")
+    (it "should return nil when on non-item line (header)"
+      (jj-test-with-status-buffer
+        (:log-output "@  qpvuntsm | Working copy | \n"
+         :status-output "Working copy changes:\n"
+         :bookmark-output "")
+        ;; Position on header
         (goto-char (point-min))
         (let ((result (jj-status--item-at-point)))
           (expect (plist-get result :type) :to-be nil)
           (expect (plist-get result :data) :to-be nil)))))
 
-  (describe "jj-status-next-item"
-    (it "should move to next item with jj-item property"
-      (with-temp-buffer
-        (insert "Header\n")
-        (insert "Item 1\n")
-        (insert "Item 2\n")
-        ;; Mark only items, not header
-        (put-text-property 8 15 'jj-item '(:path "file1.txt"))
-        (put-text-property 15 22 'jj-item '(:path "file2.txt"))
-        (goto-char (point-min))
-        (jj-status-next-item)
-        (expect (point) :to-equal 8)))
-
-    (it "should skip lines without jj-item property"
-      (with-temp-buffer
-        (insert "Header\n")
-        (insert "Blank\n")
-        (insert "Item\n")
-        (put-text-property 14 19 'jj-item '(:path "test.txt"))
-        (goto-char (point-min))
-        (jj-status-next-item)
-        (expect (point) :to-equal 14))))
-
-  (describe "jj-status-prev-item"
-    (it "should move to previous item with jj-item property"
-      (with-temp-buffer
-        (insert "Item 1\n")
-        (insert "Item 2\n")
-        (insert "Item 3\n")
-        (put-text-property (point-min) 7 'jj-item '(:path "file1.txt"))
-        (put-text-property 7 14 'jj-item '(:path "file2.txt"))
-        (put-text-property 14 21 'jj-item '(:path "file3.txt"))
-        (goto-char 16)  ; Start in Item 3
-        (let ((start-item (get-text-property (point) 'jj-item)))
-          (jj-status-prev-item)
-          ;; Should have moved to a different item
-          (let ((new-item (get-text-property (point) 'jj-item)))
-            (expect new-item :not :to-equal start-item))))))
-
   (describe "jj-status-show-diff"
     (it "should show placeholder message for files"
-      (with-temp-buffer
-        (insert "M  test.txt\n")
-        (put-text-property 1 (1- (point-max)) 'jj-item '(:path "test.txt" :status "M"))
-        (goto-char 1)
-        ;; Function shows message, doesn't throw error
-        (jj-status-show-diff)
-        (expect t :to-be t)))
+      (jj-test-with-status-buffer
+        (:log-output "@  qpvuntsm | Working copy | \n"
+         :status-output "Working copy changes:\nM file1.txt\n"
+         :bookmark-output "")
+        ;; Navigate to file
+        (goto-char (point-min))
+        (jj-status-next-item)
+        ;; Call show-diff - should not error, just show message
+        (expect (jj-status-show-diff) :not :to-throw)))
 
     (it "should show placeholder message for revisions"
-      (with-temp-buffer
-        (insert "@  qpvuntsm  Working copy\n")
-        (put-text-property 1 (1- (point-max)) 'jj-item '(:change-id "qpvuntsm"))
-        (goto-char 1)
-        ;; Function shows message, doesn't throw error
-        (jj-status-show-diff)
-        (expect t :to-be t)))))
+      (jj-test-with-status-buffer
+        (:log-output "@  qpvuntsm | Working copy | \n"
+         :status-output "Working copy changes:\n"
+         :bookmark-output "")
+        ;; Navigate to revision
+        (goto-char (point-min))
+        (jj-status-next-item)
+        ;; Call show-diff - should not error
+        (expect (jj-status-show-diff) :not :to-throw)))
+
+    (it "should handle being called on non-item lines"
+      (jj-test-with-status-buffer
+        (:log-output "@  qpvuntsm | Working copy | \n"
+         :status-output "Working copy changes:\n"
+         :bookmark-output "")
+        ;; Position on header (non-item)
+        (goto-char (point-min))
+        ;; Should not error
+        (expect (jj-status-show-diff) :not :to-throw)))))
 
 ;;; test-jj-navigation.el ends here
