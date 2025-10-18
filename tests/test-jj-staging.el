@@ -46,21 +46,21 @@
 
   (describe "jj-status--find-last-described-revision"
     (it "should find most recent revision with description"
-      (let ((revisions '((:change-id "abc123" :description "no description set")
-                         (:change-id "def456" :description "Add feature")
-                         (:change-id "ghi789" :description "Fix bug"))))
+      (let ((revisions '((:graph-line "@  " :change-id "abc123" :description "")
+                         (:graph-line "○  " :change-id "def456" :description "Add feature")
+                         (:graph-line "○  " :change-id "ghi789" :description "Fix bug"))))
         (let ((result (jj-status--find-last-described-revision revisions)))
           (expect (plist-get result :change-id) :to-equal "def456")
           (expect (plist-get result :description) :to-equal "Add feature"))))
 
     (it "should return nil when no described revision exists"
-      (let ((revisions '((:change-id "abc123" :description "no description set")
-                         (:change-id "def456" :description "no description set"))))
+      (let ((revisions '((:graph-line "@  " :change-id "abc123" :description "")
+                         (:graph-line "○  " :change-id "def456" :description ""))))
         (expect (jj-status--find-last-described-revision revisions) :to-be nil)))
 
     (it "should iterate from top of list (most recent)"
-      (let ((revisions '((:change-id "new123" :description "Latest change")
-                         (:change-id "old456" :description "Old change"))))
+      (let ((revisions '((:graph-line "○  " :change-id "new123" :description "Latest change")
+                         (:graph-line "○  " :change-id "old456" :description "Old change"))))
         (let ((result (jj-status--find-last-described-revision revisions)))
           (expect (plist-get result :change-id) :to-equal "new123"))))
 
@@ -70,7 +70,7 @@
   (describe "jj-status--validate-staging-target"
     (it "should return t when revision is mutable"
       (jj-test-with-mocked-command
-        '(("jj" ("--no-pager" "--color" "never" "log" "-r" "\"immutable_heads()\"" "-T" "'change_id'" "--no-graph")
+        '(("jj" ("--no-pager" "--color" "never" "log" "-r" "immutable_heads()" "-T" "change_id" "--no-graph")
            :exit-code 0
            :stdout "other123\nother456\n"
            :stderr ""))
@@ -79,7 +79,7 @@
 
     (it "should return nil when revision is immutable"
       (jj-test-with-mocked-command
-        '(("jj" ("--no-pager" "--color" "never" "log" "-r" "\"immutable_heads()\"" "-T" "'change_id'" "--no-graph")
+        '(("jj" ("--no-pager" "--color" "never" "log" "-r" "immutable_heads()" "-T" "change_id" "--no-graph")
            :exit-code 0
            :stdout "abc123\ndef456\n"
            :stderr ""))
@@ -95,9 +95,11 @@
     (it "should error when no described revision found"
       (with-temp-buffer
         (jj-status-mode)
-        ;; Set buffer-local revisions with no described revision
-        (setq-local jj-status--revisions
-                    '((:change-id "abc123" :description "no description set")))
+        ;; Set buffer-local parsed-data with no described revision
+        (setq-local jj-status--parsed-data
+                    (list :revisions '((:graph-line "@  " :change-id "abc123" :description ""))
+                          :files '()
+                          :bookmarks '()))
         ;; Insert a file item
         (let ((inhibit-read-only t))
           (insert "  M  test.txt\n")
@@ -108,16 +110,18 @@
 
     (it "should error when target revision is immutable"
       (jj-test-with-mocked-command
-        '(("jj" ("--no-pager" "--color" "never" "log" "-r" "\"immutable_heads()\"" "-T" "'change_id'" "--no-graph")
+        '(("jj" ("--no-pager" "--color" "never" "log" "-r" "immutable_heads()" "-T" "change_id" "--no-graph")
            :exit-code 0
            :stdout "def456\n"
            :stderr ""))
         (jj-test-with-project-folder "/tmp/test"
           (with-temp-buffer
             (jj-status-mode)
-            ;; Set buffer-local revisions
-            (setq-local jj-status--revisions
-                        '((:change-id "def456" :description "Add feature")))
+            ;; Set buffer-local parsed-data
+            (setq-local jj-status--parsed-data
+                        (list :revisions '((:graph-line "○  " :change-id "def456" :description "Add feature"))
+                              :files '()
+                              :bookmarks '()))
             ;; Insert a file item
             (let ((inhibit-read-only t))
               (insert "  M  test.txt\n")
@@ -130,7 +134,7 @@
       (let ((squash-executed nil)
             (refresh-called nil))
         (jj-test-with-mocked-command
-          '(("jj" ("--no-pager" "--color" "never" "log" "-r" "\"immutable_heads()\"" "-T" "'change_id'" "--no-graph")
+          '(("jj" ("--no-pager" "--color" "never" "log" "-r" "immutable_heads()" "-T" "change_id" "--no-graph")
              :exit-code 0
              :stdout "other123\n"
              :stderr "")
@@ -143,9 +147,11 @@
                        (lambda () (setq refresh-called t))))
               (with-temp-buffer
                 (jj-status-mode)
-                ;; Set buffer-local revisions
-                (setq-local jj-status--revisions
-                            '((:change-id "def456" :description "Add feature")))
+                ;; Set buffer-local parsed-data
+                (setq-local jj-status--parsed-data
+                            (list :revisions '((:graph-line "○  " :change-id "def456" :description "Add feature"))
+                                  :files '()
+                                  :bookmarks '()))
                 ;; Insert a file item
                 (let ((inhibit-read-only t))
                   (insert "  M  test.txt\n")

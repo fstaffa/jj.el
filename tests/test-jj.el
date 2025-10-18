@@ -461,21 +461,16 @@
   (let ((test-cases
          '((:description "should create buffer with correct name format"
             :project-name "test-repo"
-            :fixture "sample-status.txt"
-            :expected-buffer-name "jj: test-repo")
-           (:description "should populate buffer with status command output"
-            :project-name "my-project"
-            :fixture "sample-status.txt"
-            :verify-type content))))
+            :expected-buffer-name "jj: test-repo"))))
     (dolist (test-case test-cases)
       (it (plist-get test-case :description)
         (let* ((project-name (plist-get test-case :project-name))
                (project-folder (format "/tmp/%s/" project-name))
-               (fixture-content (jj-test-load-fixture (plist-get test-case :fixture)))
                (captured-buffer-name nil)
                (captured-buffer nil)
-               (cmd-list '("status"))
-               (expected-args (jj-test--build-args cmd-list)))
+               (log-cmd '("log" "--revisions" "immutable_heads()..@" "-T" "change_id ++ ' | ' ++ description.first_line() ++ ' | ' ++ bookmarks"))
+               (status-cmd '("status"))
+               (bookmark-cmd '("bookmark" "list")))
           (cl-letf (((symbol-function 'switch-to-buffer)
                      (lambda (buf)
                        (when (bufferp buf)
@@ -483,16 +478,21 @@
                          (setq captured-buffer buf))
                        nil)))
             (jj-test-with-mocked-command
-              (list (list "jj" expected-args
+              (list (list "jj" (jj-test--build-args log-cmd)
                           :exit-code 0
-                          :stdout fixture-content
+                          :stdout "@  qpvuntsm | Working copy | main\n"
+                          :stderr "")
+                    (list "jj" (jj-test--build-args status-cmd)
+                          :exit-code 0
+                          :stdout "Working copy changes:\nM test.txt\n"
+                          :stderr "")
+                    (list "jj" (jj-test--build-args bookmark-cmd)
+                          :exit-code 0
+                          :stdout "main: qpvuntsm abc123 description\n"
                           :stderr ""))
               (jj-test-with-project-folder project-folder
                 (jj-status)
-                (if (eq (plist-get test-case :verify-type) 'content)
-                    (with-current-buffer captured-buffer
-                      (expect (buffer-string) :to-equal fixture-content))
-                  (expect captured-buffer-name :to-equal (plist-get test-case :expected-buffer-name)))))
+                (expect captured-buffer-name :to-equal (plist-get test-case :expected-buffer-name))))
             (when captured-buffer
               (kill-buffer captured-buffer))))))))
 
@@ -716,15 +716,25 @@
   (it "should construct abandon command with args"
     (let ((captured-buffer nil)
           (abandon-cmd-list '("abandon" "trunk()..main"))
-          (status-cmd-list '("status")))
+          (log-cmd '("log" "--revisions" "immutable_heads()..@" "-T" "change_id ++ ' | ' ++ description.first_line() ++ ' | ' ++ bookmarks"))
+          (status-cmd '("status"))
+          (bookmark-cmd '("bookmark" "list")))
       (jj-test-with-mocked-command
         (list (list "jj" (jj-test--build-args abandon-cmd-list)
                     :exit-code 0
                     :stdout ""
                     :stderr "")
-              (list "jj" (jj-test--build-args status-cmd-list)
+              (list "jj" (jj-test--build-args log-cmd)
+                    :exit-code 0
+                    :stdout "@  qpvuntsm | Working copy | main\n"
+                    :stderr "")
+              (list "jj" (jj-test--build-args status-cmd)
                     :exit-code 0
                     :stdout "Working copy changes: none"
+                    :stderr "")
+              (list "jj" (jj-test--build-args bookmark-cmd)
+                    :exit-code 0
+                    :stdout "main: qpvuntsm abc123 description\n"
                     :stderr ""))
         (cl-letf (((symbol-function 'switch-to-buffer)
                    (lambda (buf)
@@ -757,15 +767,25 @@
   (it "should construct describe command and refresh status"
     (let ((status-called nil)
           (describe-cmd-list '("describe" "-m=test message"))
-          (status-cmd-list '("status")))
+          (log-cmd '("log" "--revisions" "immutable_heads()..@" "-T" "change_id ++ ' | ' ++ description.first_line() ++ ' | ' ++ bookmarks"))
+          (status-cmd '("status"))
+          (bookmark-cmd '("bookmark" "list")))
       (jj-test-with-mocked-command
         (list (list "jj" (jj-test--build-args describe-cmd-list)
                     :exit-code 0
                     :stdout ""
                     :stderr "")
-              (list "jj" (jj-test--build-args status-cmd-list)
+              (list "jj" (jj-test--build-args log-cmd)
+                    :exit-code 0
+                    :stdout "@  qpvuntsm | Working copy | main\n"
+                    :stderr "")
+              (list "jj" (jj-test--build-args status-cmd)
                     :exit-code 0
                     :stdout "Working copy changes: none"
+                    :stderr "")
+              (list "jj" (jj-test--build-args bookmark-cmd)
+                    :exit-code 0
+                    :stdout "main: qpvuntsm abc123 description\n"
                     :stderr ""))
         (cl-letf (((symbol-function 'switch-to-buffer)
                    (lambda (_buf) (setq status-called t))))
@@ -778,15 +798,25 @@
   ;; Uses fixture: status-with-many-changes.txt
   (it "should handle status with many file changes"
     (let ((buffer nil)
-          (cmd-list '("status")))
+          (log-cmd '("log" "--revisions" "immutable_heads()..@" "-T" "change_id ++ ' | ' ++ description.first_line() ++ ' | ' ++ bookmarks"))
+          (status-cmd '("status"))
+          (bookmark-cmd '("bookmark" "list")))
       (cl-letf (((symbol-function 'switch-to-buffer)
                  (lambda (buf)
                    (setq buffer buf)
                    nil)))
         (jj-test-with-mocked-command
-          (list (list "jj" (jj-test--build-args cmd-list)
+          (list (list "jj" (jj-test--build-args log-cmd)
+                      :exit-code 0
+                      :stdout "@  qpvuntsm | Working copy | main\n"
+                      :stderr "")
+                (list "jj" (jj-test--build-args status-cmd)
                       :exit-code 0
                       :stdout (jj-test-load-fixture "edge-cases/status-with-many-changes.txt")
+                      :stderr "")
+                (list "jj" (jj-test--build-args bookmark-cmd)
+                      :exit-code 0
+                      :stdout "main: qpvuntsm abc123 description\n"
                       :stderr ""))
           (jj-test-with-project-folder "/tmp/test"
             (jj-status)
@@ -1185,7 +1215,9 @@
     (let ((jj-debug-mode t)
           (log-messages '())
           (captured-buffer nil)
-          (cmd-list '("status")))
+          (log-cmd '("log" "--revisions" "immutable_heads()..@" "-T" "change_id ++ ' | ' ++ description.first_line() ++ ' | ' ++ bookmarks"))
+          (status-cmd '("status"))
+          (bookmark-cmd '("bookmark" "list")))
       (cl-letf (((symbol-function 'message)
                  (lambda (format-string &rest args)
                    (let ((msg (apply #'format format-string args)))
@@ -1195,9 +1227,17 @@
                    (setq captured-buffer buf)
                    nil)))
         (jj-test-with-mocked-command
-          (list (list "jj" (jj-test--build-args cmd-list)
+          (list (list "jj" (jj-test--build-args log-cmd)
+                      :exit-code 0
+                      :stdout "@  qpvuntsm | Working copy | main\n"
+                      :stderr "")
+                (list "jj" (jj-test--build-args status-cmd)
                       :exit-code 0
                       :stdout "Working copy: clean\n"
+                      :stderr "")
+                (list "jj" (jj-test--build-args bookmark-cmd)
+                      :exit-code 0
+                      :stdout "main: qpvuntsm abc123 description\n"
                       :stderr ""))
           (jj-test-with-project-folder "/tmp/test"
             (jj-status)

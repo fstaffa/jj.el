@@ -46,7 +46,7 @@
 
   (describe "jj-status--fetch-revision-list"
     (it "should execute jj log command with graph and custom template"
-      (let ((expected-cmd "log --revisions \"immutable_heads()..@\" --graph -T 'change_id ++ \"\\n\" ++ description ++ \"\\n\" ++ bookmarks ++ \"\\n\"'")
+      (let ((expected-cmd '("log" "--revisions" "immutable_heads()..@" "-T" "change_id ++ ' | ' ++ description.first_line() ++ ' | ' ++ bookmarks"))
             (sample-output "@  qpvuntsmqxuquz57\nWorking copy\n\n")
             (captured-command nil))
         (cl-letf (((symbol-function 'jj--run-command)
@@ -79,7 +79,7 @@
 
   (describe "jj-status--fetch-working-copy-status"
     (it "should execute jj status command"
-      (let ((expected-cmd "status")
+      (let ((expected-cmd '("status"))
             (sample-output "Working copy changes:\nA src/file.el\n")
             (captured-command nil))
         (cl-letf (((symbol-function 'jj--run-command)
@@ -100,7 +100,7 @@
 
   (describe "jj-status--fetch-bookmark-list"
     (it "should execute jj bookmark list command with custom template"
-      (let ((expected-cmd "bookmark list -T 'name ++ \"\\t\" ++ change_id ++ \"\\n\"'")
+      (let ((expected-cmd '("bookmark" "list"))
             (sample-output "main\tqpvuntsmqxuquz57\ndev\tyqosqzytrlsw\n")
             (captured-command nil))
         (cl-letf (((symbol-function 'jj--run-command)

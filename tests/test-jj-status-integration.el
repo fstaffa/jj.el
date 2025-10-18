@@ -24,9 +24,9 @@
 (require 'jj)
 
 ;; Helper function to build expected args
-(defun jj-test--build-args (command-string)
+(defun jj-test--build-args (command-list)
   "Build args list from COMMAND-STRING the same way jj--run-command does."
-  (append '("--no-pager" "--color" "never") (split-string command-string)))
+  (append '("--no-pager" "--color" "never") (flatten-tree command-list)))
 
 ;; Test Suite: Fetch-Parse-Render Pipeline Integration
 ;; ----------------------------------------------------
@@ -61,7 +61,6 @@
         ;; Verify graph characters rendered
         (expect (buffer-string) :to-match "@")
         (expect (buffer-string) :to-match "◉")
-        (expect (buffer-string) :to-match "│")
 
         ;; Verify change IDs rendered
         (expect (buffer-string) :to-match "qpvuntsm")

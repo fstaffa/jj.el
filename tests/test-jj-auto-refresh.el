@@ -38,15 +38,25 @@
   (it "should call jj-status after successful describe command"
     (let ((buffer-created nil)
           (describe-cmd '("describe" "-m" "Test message"))
-          (status-cmd '("status")))
+          (log-cmd '("log" "--revisions" "immutable_heads()..@" "-T" "change_id ++ ' | ' ++ description.first_line() ++ ' | ' ++ bookmarks"))
+          (status-cmd '("status"))
+          (bookmark-cmd '("bookmark" "list")))
       (jj-test-with-mocked-command
         (list (list "jj" (jj-test--build-args describe-cmd)
+                    :exit-code 0
+                    :stdout ""
+                    :stderr "")
+              (list "jj" (jj-test--build-args log-cmd)
                     :exit-code 0
                     :stdout ""
                     :stderr "")
               (list "jj" (jj-test--build-args status-cmd)
                     :exit-code 0
                     :stdout "Working copy changes:\nM  test.txt\n"
+                    :stderr "")
+              (list "jj" (jj-test--build-args bookmark-cmd)
+                    :exit-code 0
+                    :stdout ""
                     :stderr ""))
         (cl-letf (((symbol-function 'switch-to-buffer)
                    (lambda (_buf) (setq buffer-created t) nil)))
@@ -63,15 +73,25 @@
   (it "should call jj-status after successful abandon command"
     (let ((buffer-created nil)
           (abandon-cmd '("abandon" "trunk()..main"))
-          (status-cmd '("status")))
+          (log-cmd '("log" "--revisions" "immutable_heads()..@" "-T" "change_id ++ ' | ' ++ description.first_line() ++ ' | ' ++ bookmarks"))
+          (status-cmd '("status"))
+          (bookmark-cmd '("bookmark" "list")))
       (jj-test-with-mocked-command
         (list (list "jj" (jj-test--build-args abandon-cmd)
+                    :exit-code 0
+                    :stdout ""
+                    :stderr "")
+              (list "jj" (jj-test--build-args log-cmd)
                     :exit-code 0
                     :stdout ""
                     :stderr "")
               (list "jj" (jj-test--build-args status-cmd)
                     :exit-code 0
                     :stdout "Working copy changes:\n"
+                    :stderr "")
+              (list "jj" (jj-test--build-args bookmark-cmd)
+                    :exit-code 0
+                    :stdout ""
                     :stderr ""))
         (cl-letf (((symbol-function 'switch-to-buffer)
                    (lambda (_buf) (setq buffer-created t) nil)))
@@ -88,15 +108,25 @@
   (it "should call jj-status after successful new command"
     (let ((buffer-created nil)
           (new-cmd '("new" "-m" "New change"))
-          (status-cmd '("status")))
+          (log-cmd '("log" "--revisions" "immutable_heads()..@" "-T" "change_id ++ ' | ' ++ description.first_line() ++ ' | ' ++ bookmarks"))
+          (status-cmd '("status"))
+          (bookmark-cmd '("bookmark" "list")))
       (jj-test-with-mocked-command
         (list (list "jj" (jj-test--build-args new-cmd)
+                    :exit-code 0
+                    :stdout ""
+                    :stderr "")
+              (list "jj" (jj-test--build-args log-cmd)
                     :exit-code 0
                     :stdout ""
                     :stderr "")
               (list "jj" (jj-test--build-args status-cmd)
                     :exit-code 0
                     :stdout "Working copy changes:\n"
+                    :stderr "")
+              (list "jj" (jj-test--build-args bookmark-cmd)
+                    :exit-code 0
+                    :stdout ""
                     :stderr ""))
         (cl-letf (((symbol-function 'switch-to-buffer)
                    (lambda (_buf) (setq buffer-created t) nil))

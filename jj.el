@@ -659,9 +659,10 @@ Example:
     (cl-loop for revision in revisions
              for graph = (plist-get revision :graph-line)
              for description = (plist-get revision :description)
-             ;; Skip working copy (@) and revisions with empty descriptions
+             ;; Skip working copy (@) and revisions with empty or placeholder descriptions
              when (and (not (string-match-p "@" graph))
-                       (not (string-empty-p description)))
+                       (not (string-empty-p description))
+                       (not (string-match-p "(no description set)" description)))
              return revision)))
 
 (defun jj-status--validate-staging-target (change-id)
@@ -690,24 +691,45 @@ Example:
   "Refresh the status buffer with current repository state.
 Bound to g key in jj-status-mode.
 
-Re-fetches repository data and re-renders the status buffer."
+Re-fetches repository data and re-renders the status buffer.
+Preserves cursor position by remembering the item at point."
   (interactive)
   (jj--validate-repository)
-  ;; Fetch data from jj
-  (let ((revision-output (jj-status--fetch-revision-list))
-        (status-output (jj-status--fetch-working-copy-status))
-        (bookmark-output (jj-status--fetch-bookmark-list)))
-    ;; Parse outputs into data structures
-    (let ((revisions (jj-status--parse-log-output revision-output))
-          (files (jj-status--parse-status-output status-output))
-          (bookmarks (jj-status--parse-bookmark-output bookmark-output)))
-      ;; Re-render current buffer
-      (jj-status--render-buffer revisions files bookmarks)
-      ;; Update parsed data for navigation and staging
-      (setq-local jj-status--parsed-data (list :revisions revisions
-                                                :files files
-                                                :bookmarks bookmarks))
-      (message "Status refreshed"))))
+  ;; Save cursor position by remembering the item at point
+  (let ((saved-item (get-text-property (point) 'jj-item))
+        (saved-line (line-number-at-pos)))
+    ;; Fetch data from jj
+    (let ((revision-output (jj-status--fetch-revision-list))
+          (status-output (jj-status--fetch-working-copy-status))
+          (bookmark-output (jj-status--fetch-bookmark-list)))
+      ;; Parse outputs into data structures
+      (let ((revisions (jj-status--parse-log-output revision-output))
+            (files (jj-status--parse-status-output status-output))
+            (bookmarks (jj-status--parse-bookmark-output bookmark-output)))
+        ;; Re-render current buffer
+        (jj-status--render-buffer revisions files bookmarks)
+        ;; Update parsed data for navigation and staging
+        (setq-local jj-status--parsed-data (list :revisions revisions
+                                                  :files files
+                                                  :bookmarks bookmarks))
+        ;; Restore cursor position
+        (when saved-item
+          (goto-char (point-min))
+          (let ((found nil))
+            ;; Try to find the same item in the refreshed buffer
+            (while (and (not found) (not (eobp)))
+              (let ((current-item (get-text-property (point) 'jj-item)))
+                (when (equal current-item saved-item)
+                  ;; Move to beginning of line for consistency
+                  (beginning-of-line)
+                  (setq found t))
+                (unless found
+                  (forward-char))))
+            ;; If item not found, go back to the original line (or close to it)
+            (unless found
+              (goto-char (point-min))
+              (forward-line (1- saved-line)))))
+        (message "Status refreshed")))))
 
 (defun jj-status-stage-file ()
   "Stage file at point to last described revision.
